@@ -30,7 +30,7 @@ export default function App() {
     const pingUrl =
       // prefer Vite env variable if available, else fallback
       (import.meta as any).env?.VITE_BACKEND_PING_URL ||
-      "https://your-backend.onrender.com/api/ping";
+      "https://bx-clan-backend.onrender.com/api/ping";
 
     let mounted = true;
 
