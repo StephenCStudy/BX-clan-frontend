@@ -23,4 +23,18 @@ export default defineConfig({
       },
     },
   },
+  // Increase chunk size warning limit to reduce noisy warnings during build.
+  // Value is in KB. Default is 500 (KB). Set to 2000 (2 MB) here as a sensible default
+  // while you evaluate opportunities to split or reduce heavy dependencies.
+  build: {
+    chunkSizeWarningLimit: 2000,
+    // Optional: you can add rollupOptions.manualChunks to split large vendor bundles.
+    // rollupOptions: {
+    //   output: {
+    //     manualChunks: {
+    //       react: ["react", "react-dom"],
+    //     },
+    //   },
+    // },
+  },
 });

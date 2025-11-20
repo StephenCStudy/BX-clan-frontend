@@ -19,54 +19,13 @@ import CustomDetailPage from "./pages/CustomDetailPage";
 import NewsPage from "./pages/NewsPage";
 import NewsDetailPage from "./pages/NewsDetailPage";
 import RegistrationPage from "./pages/RegistrationPage";
-import { useEffect, useState } from "react";
-import LoadingSpinner from "./components/LoadingSpinner";
-import { callBackend } from "./utils/callBackend";
 
 // vercel / render reload backend ping helper
 export default function App() {
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const pingUrl =
-      // prefer Vite env variable if available, else fallback
-      (import.meta as any).env?.VITE_BACKEND_PING_URL ||
-      "https://bx-clan-backend.onrender.com/api/ping";
-
-    let mounted = true;
-
-    async function wakeBackend() {
-      setLoading(true);
-      try {
-        // use callBackend's retry logic; increase retries here if you want longer waiting
-        await callBackend(pingUrl, 12, 2000);
-      } catch (err: any) {
-        // final failure after retries – keep error logged; we still stop loading
-        console.error("Backend ping failed:", err?.message || err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    wakeBackend();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   return (
     <AuthProvider>
       <div className="min-h-screen flex flex-col bg-white text-gray-900">
-        {loading && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/90">
-            <div className="text-center">
-              <LoadingSpinner />
-              <div className="mt-3 text-gray-700">
-                Đang tải dữ liệu, vui lòng chờ...
-              </div>
-            </div>
-          </div>
-        )}
         <Header />
         <main className="flex-1">
           <Routes>
