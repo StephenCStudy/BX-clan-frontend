@@ -1,0 +1,180 @@
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Monsieur+La+Doulaise&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Passion+One:wght@400;700;900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+@import "./theme.css";
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 50%, #ffffff 100%);
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings use Poppins for a friendly, strong look */
+h1, h2, h3, h4, h5 {
+  font-family: 'Poppins', 'Montserrat', sans-serif;
+  color: #dc2626;
+}
+
+/* Utility adjustments to match design language */
+.shadow-soft {
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
+}
+
+.shadow-card {
+  box-shadow: 0 4px 16px rgba(46, 125, 50, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover {
+  background-color: #1B5E20;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(46, 125, 50, 0.2);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, var(--color-accent) 0%, #FFD600 100%);
+  color: #333;
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 235, 59, 0.3);
+}
+
+.btn-accent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 235, 59, 0.4);
+}
+
+/* Property card image cropping */
+.prop-img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.3s ease;
+}
+
+/* Text utilities */
+.text-muted {
+  color: var(--text-muted);
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Gradient backgrounds */
+.bg-gradient-natural {
+  background: linear-gradient(135deg, var(--color-cream) 0%, #ffffff 50%, var(--color-pastel) 100%);
+}
+
+/* Animation utilities */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-cream);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-pastel);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
+/* Additional button styles */
+.btn-outline {
+  background: transparent;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  border-radius: 12px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-outline:hover {
+  background-color: var(--color-primary);
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Font family utilities */
+.font-heading {
+  font-family: 'Poppins', 'Montserrat', sans-serif;
+}
+
+/* Focus states for accessibility */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Loading spinner */
+.spinner {
+  border: 3px solid var(--color-pastel);
+  border-top: 3px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}

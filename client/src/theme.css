@@ -1,0 +1,17 @@
+:root {
+    --color-primary: #b91c1c;
+    /* red-700 */
+    --color-accent: #ef4444;
+    /* red-500 */
+    --color-cream: #0b0b0d;
+    /* dark bg */
+    --color-pastel: #7f1d1d;
+    /* red-900 */
+    --text-muted: #9ca3af;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+    }
+}
