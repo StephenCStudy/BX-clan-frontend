@@ -807,9 +807,14 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="px-2 md:px-3 py-2 md:py-3 hidden lg:table-cell">
-                            <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded border border-gray-300">
-                              123456
-                            </span>
+                            <div className="text-xs">
+                              <span className="font-mono bg-gray-100 px-2 py-1 rounded border border-gray-300 inline-block">
+                                ••••••••
+                              </span>
+                              <span className="block text-[10px] text-gray-500 mt-1">
+                                Ẩn vì bảo mật
+                              </span>
+                            </div>
                           </td>
                           <td className="px-2 md:px-3 py-2 md:py-3">
                             <select

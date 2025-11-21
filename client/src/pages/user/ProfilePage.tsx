@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { upload } from "../../utils";
 import { http } from "../../utils/http";
@@ -6,6 +6,38 @@ import { toast } from "react-toastify";
 import { io, Socket } from "socket.io-client";
 import { getRankColors, getLaneColors } from "../../utils/rankLaneColors";
 import NotificationModal from "../../components/NotificationModal";
+
+type AdminContact = {
+  _id: string;
+  username: string;
+  ingameName?: string;
+  role: string;
+  avatarUrl?: string;
+};
+
+type PrivateChatUser = {
+  _id: string;
+  username: string;
+  avatarUrl?: string;
+  role?: string;
+};
+
+type PrivateChatMessage = {
+  _id?: string;
+  from?: PrivateChatUser;
+  to?: PrivateChatUser;
+  message: string;
+  createdAt?: string;
+};
+
+type UserNotification = {
+  _id: string;
+  type: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+};
 
 type EditModalProps = {
   open: boolean;
@@ -163,9 +195,9 @@ function AvatarModal({
   onUpload,
   uploading,
 }: AvatarModalProps) {
-  if (!open) return null;
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -231,7 +263,7 @@ function AvatarModal({
 }
 
 export default function ProfilePage() {
-  const { user, refreshUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
@@ -240,25 +272,16 @@ export default function ProfilePage() {
     rank: "",
     lane: "",
   });
-  const [admins, setAdmins] = useState<
-    Array<{
-      ingameName: string; _id: string; username: string; role: string 
-}>
-  >([]);
+  const [admins, setAdmins] = useState<AdminContact[]>([]);
   const [selectedAdmin, setSelectedAdmin] = useState<string>("");
-  const [messages, setMessages] = useState<
-    Array<{
-      _id?: string;
-      from?: any;
-      to?: any;
-      message: string;
-      createdAt?: string;
-    }>
-  >([]);
+  const [messages, setMessages] = useState<PrivateChatMessage[]>([]);
   const [text, setText] = useState("");
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const selectedAdminRef = useRef<string | null>(null);
   const SOCKET_URL = useMemo(
     () => import.meta.env.VITE_SOCKET_URL || "http://localhost:5000",
     []
@@ -271,13 +294,14 @@ export default function ProfilePage() {
       if (!url) {
         throw new Error("Upload không trả về URL");
       }
-      await http.put("/auth/me/avatar", { avatarUrl: url });
-      await refreshUser();
+      const res = await http.put("/auth/me/avatar", { avatarUrl: url });
+      updateUser({ avatarUrl: res.data?.avatarUrl || url });
       toast.success("Cập nhật avatar thành công");
       setAvatarModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Avatar upload error:", err);
-      toast.error(err?.message || "Upload thất bại");
+      const message = err instanceof Error ? err.message : "Upload thất bại";
+      toast.error(message);
     } finally {
       setUploading(false);
     }
@@ -285,8 +309,12 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async () => {
     try {
-      await http.put("/auth/me", form);
-      await refreshUser();
+      const res = await http.put("/auth/me", form);
+      updateUser({
+        ingameName: res.data?.ingameName ?? form.ingameName,
+        rank: res.data?.rank ?? form.rank,
+        lane: res.data?.lane ?? form.lane,
+      });
       toast.success("Đã cập nhật thông tin");
       setEditModalOpen(false);
     } catch {
@@ -315,28 +343,70 @@ export default function ProfilePage() {
     }
   };
 
+  const loadConversation = useCallback(
+    async (adminId: string) => {
+      if (!adminId || !user) return;
+      setMessagesLoading(true);
+      try {
+        const res = await http.get<PrivateChatMessage[]>(
+          `/private-messages/conversation/${adminId}`
+        );
+        setMessages(res.data || []);
+      } catch {
+        setMessages([]);
+      } finally {
+        setMessagesLoading(false);
+      }
+    },
+    [user]
+  );
+
+  const handleSendMessage = () => {
+    if (!text.trim() || !selectedAdmin || !user) return;
+    if (!socketRef.current) {
+      toast.error("Không thể kết nối máy chủ tin nhắn");
+      return;
+    }
+    socketRef.current.emit("private:send", {
+      from: user.id,
+      to: selectedAdmin,
+      message: text.trim(),
+      fromUser: user,
+    });
+    setText("");
+  };
+
   useEffect(() => {
     if (!user) return;
     setForm({
       ingameName: user.ingameName || "",
-      rank: (user as any).rank || "",
-      lane: (user as any).lane || "",
+      rank: user.rank || "",
+      lane: user.lane || "",
     });
   }, [user]);
+
+  useEffect(() => {
+    selectedAdminRef.current = selectedAdmin || null;
+  }, [selectedAdmin]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     // Load admins (leaders/organizers/moderators)
     http
       .get("/members")
       .then((res) => {
-        const list = (res.data || []).filter(
-          (m: any) =>
+        const list: AdminContact[] = res.data || [];
+        const filtered = list.filter(
+          (m) =>
             m.role === "leader" ||
             m.role === "organizer" ||
             m.role === "moderator"
         );
-        setAdmins(list);
-        if (list.length) setSelectedAdmin(list[0]._id);
+        setAdmins(filtered);
+        if (filtered.length) setSelectedAdmin(filtered[0]._id);
       })
       .catch(() => {});
 
@@ -352,57 +422,47 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!user) return;
 
-    // Setup socket for private messaging
     const s = io(SOCKET_URL);
-
-    // Join user's personal room
     s.emit("user:join", user.id);
 
-    // Listen for incoming private messages
-    s.on("private:receive", (msg: any) => {
-      // Only add to messages if it's from the currently selected admin
-      if (msg.from._id === selectedAdmin || msg.from._id === user.id) {
+    const appendIfActive = (msg: PrivateChatMessage) => {
+      const target = selectedAdminRef.current;
+      if (!target) return;
+      if (msg.from?._id === target || msg.to?._id === target) {
         setMessages((prev) => [...prev, msg]);
       }
-    });
+    };
 
-    // Listen for sent message confirmation
-    s.on("private:sent", (msg: any) => {
-      setMessages((prev) => [...prev, msg]);
-    });
+    s.on("private:receive", appendIfActive);
+    s.on("private:sent", appendIfActive);
 
     socketRef.current = s;
 
     return () => {
+      s.off("private:receive", appendIfActive);
+      s.off("private:sent", appendIfActive);
       s.disconnect();
     };
-  }, [SOCKET_URL, user, selectedAdmin]);
+  }, [SOCKET_URL, user]);
 
   // Load conversation when admin selection changes
   useEffect(() => {
-    if (!selectedAdmin || !user) return;
-
-    http
-      .get(`/private-messages/conversation/${selectedAdmin}`)
-      .then((res) => {
-        setMessages(res.data || []);
-      })
-      .catch(() => {
-        setMessages([]);
-      });
-  }, [selectedAdmin, user]);
-
-  if (!user) return null;
+    if (!selectedAdmin) return;
+    loadConversation(selectedAdmin);
+  }, [selectedAdmin, loadConversation]);
 
   const completeness = useMemo(() => {
+    if (!user) return 0;
     const filled = [
       form.ingameName || user.ingameName,
-      form.rank || (user as any).rank,
-      form.lane || (user as any).lane,
+      form.rank || user.rank,
+      form.lane || user.lane,
       user.avatarUrl,
     ].filter(Boolean).length;
     return Math.round((filled / 4) * 100);
   }, [form.ingameName, form.rank, form.lane, user]);
+
+  if (!user) return null;
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-5 md:p-6">
@@ -540,17 +600,17 @@ export default function ProfilePage() {
                   </div>
                   <div
                     className={`rounded-xl p-2 md:p-4 border-2 ${
-                      (user as any).rank
-                        ? `${getRankColors((user as any).rank).bg} ${
-                            getRankColors((user as any).rank).border
+                      user.rank
+                        ? `${getRankColors(user.rank).bg} ${
+                            getRankColors(user.rank).border
                           }`
                         : "bg-linear-to-br from-gray-100 to-gray-200 border-gray-300"
                     }`}
                   >
                     <div
                       className={`text-xs font-semibold mb-1 ${
-                        (user as any).rank
-                          ? getRankColors((user as any).rank).text
+                        user.rank
+                          ? getRankColors(user.rank).text
                           : "text-gray-600"
                       }`}
                     >
@@ -558,27 +618,27 @@ export default function ProfilePage() {
                     </div>
                     <div
                       className={`text-sm md:text-lg font-bold ${
-                        (user as any).rank
-                          ? getRankColors((user as any).rank).text
+                        user.rank
+                          ? getRankColors(user.rank).text
                           : "text-gray-700"
                       }`}
                     >
-                      {(user as any).rank || "—"}
+                      {user.rank || "—"}
                     </div>
                   </div>
                   <div
                     className={`rounded-xl p-2 md:p-4 border-2 ${
-                      (user as any).lane
-                        ? `${getLaneColors((user as any).lane).bg} ${
-                            getLaneColors((user as any).lane).border
+                      user.lane
+                        ? `${getLaneColors(user.lane).bg} ${
+                            getLaneColors(user.lane).border
                           }`
                         : "bg-linear-to-br from-gray-100 to-gray-200 border-gray-300"
                     }`}
                   >
                     <div
                       className={`text-xs font-semibold mb-1 ${
-                        (user as any).lane
-                          ? getLaneColors((user as any).lane).text
+                        user.lane
+                          ? getLaneColors(user.lane).text
                           : "text-gray-600"
                       }`}
                     >
@@ -586,12 +646,12 @@ export default function ProfilePage() {
                     </div>
                     <div
                       className={`text-sm md:text-lg font-bold ${
-                        (user as any).lane
-                          ? getLaneColors((user as any).lane).text
+                        user.lane
+                          ? getLaneColors(user.lane).text
                           : "text-gray-700"
                       }`}
                     >
-                      {(user as any).lane || "—"}
+                      {user.lane || "—"}
                     </div>
                   </div>
                   <div className="bg-linear-to-br from-green-50 to-emerald-50 rounded-xl p-2 md:p-4 border-2 border-green-200">
@@ -646,60 +706,66 @@ export default function ProfilePage() {
               </select>
             </div>
             <div className="h-64 overflow-y-auto rounded-lg bg-gray-50 p-3 mb-3 space-y-2 border-2 border-gray-200">
-              {messages.length === 0 && (
+              {messagesLoading ? (
+                <p className="text-center text-gray-500 text-xs md:text-sm py-8">
+                  Đang tải tin nhắn...
+                </p>
+              ) : messages.length === 0 ? (
                 <p className="text-center text-gray-400 text-xs md:text-sm py-8">
                   Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện!
                 </p>
-              )}
-              {messages.map((m, idx) => {
-                const isMyMessage = m.from?._id === user.id;
-                const senderName = isMyMessage
-                  ? "Bạn"
-                  : m.from?.username || "Admin";
-                return (
-                  <div
-                    key={m._id || idx}
-                    className={`flex ${
-                      isMyMessage ? "justify-end" : "justify-start"
-                    }`}
-                  >
+              ) : (
+                messages.map((m, idx) => {
+                  const isMyMessage = m.from?._id === user.id;
+                  const senderName = isMyMessage
+                    ? "Bạn"
+                    : m.from?.username || "Admin";
+                  return (
                     <div
-                      className={`max-w-[80%] rounded-lg p-2 md:p-3 shadow-sm ${
-                        isMyMessage
-                          ? "bg-red-600 text-white"
-                          : "bg-white border-2 border-gray-200"
+                      key={m._id || idx}
+                      className={`flex ${
+                        isMyMessage ? "justify-end" : "justify-start"
                       }`}
                     >
                       <div
-                        className={`font-semibold text-xs md:text-sm mb-1 ${
-                          isMyMessage ? "text-red-100" : "text-red-600"
+                        className={`max-w-[80%] rounded-lg p-2 md:p-3 shadow-sm ${
+                          isMyMessage
+                            ? "bg-red-600 text-white"
+                            : "bg-white border-2 border-gray-200"
                         }`}
                       >
-                        {senderName}
-                      </div>
-                      <div
-                        className={`text-xs md:text-sm ${
-                          isMyMessage ? "text-white" : "text-gray-800"
-                        }`}
-                      >
-                        {m.message}
-                      </div>
-                      {m.createdAt && (
                         <div
-                          className={`text-xs mt-1 ${
-                            isMyMessage ? "text-red-200" : "text-gray-500"
+                          className={`font-semibold text-xs md:text-sm mb-1 ${
+                            isMyMessage ? "text-red-100" : "text-red-600"
                           }`}
                         >
-                          {new Date(m.createdAt).toLocaleTimeString("vi-VN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {senderName}
                         </div>
-                      )}
+                        <div
+                          className={`text-xs md:text-sm ${
+                            isMyMessage ? "text-white" : "text-gray-800"
+                          }`}
+                        >
+                          {m.message}
+                        </div>
+                        {m.createdAt && (
+                          <div
+                            className={`text-xs mt-1 ${
+                              isMyMessage ? "text-red-200" : "text-gray-500"
+                            }`}
+                          >
+                            {new Date(m.createdAt).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
             </div>
             <div className="flex gap-2">
               <input
@@ -708,32 +774,14 @@ export default function ProfilePage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    if (!text.trim() || !selectedAdmin) return;
-                    if (!socketRef.current) return;
-                    socketRef.current.emit("private:send", {
-                      from: user.id,
-                      to: selectedAdmin,
-                      message: text,
-                      fromUser: user,
-                    });
-                    setText("");
+                    handleSendMessage();
                   }
                 }}
                 className="flex-1 p-2 md:p-2.5 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
                 placeholder="Nhập tin nhắn..."
               />
               <button
-                onClick={() => {
-                  if (!text.trim() || !selectedAdmin) return;
-                  if (!socketRef.current) return;
-                  socketRef.current.emit("private:send", {
-                    from: user.id,
-                    to: selectedAdmin,
-                    message: text,
-                    fromUser: user,
-                  });
-                  setText("");
-                }}
+                onClick={handleSendMessage}
                 className="px-3 md:px-5 py-2 md:py-2.5 rounded-lg text-white text-sm bg-red-600 hover:bg-red-700 shadow-lg font-semibold"
               >
                 Gửi

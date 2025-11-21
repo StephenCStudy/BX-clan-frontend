@@ -63,7 +63,12 @@ export default function HomePage() {
         const res = await axios.get(`${API}/notifications`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setNotifications(res.data || []);
+        const sorted = [...(res.data || [])].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() -
+            new Date(a.createdAt).getTime()
+        );
+        setNotifications(sorted);
       } catch {
         setNotifications([]);
       } finally {
@@ -253,7 +258,7 @@ export default function HomePage() {
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {/* Notifications from backend */}
-                {notifications.slice(0, 3).map((notif, idx) => {
+                {notifications.map((notif, idx) => {
                   const getNotificationIcon = () => {
                     if (notif.type === "custom-invite") return "💌";
                     if (notif.type === "room-assignment") return "🎮";

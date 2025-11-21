@@ -115,7 +115,9 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 pt-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-            <p>Made with ❤️ for the Wild Rift community</p>
+            <p>
+              Made with ❤️ for the Wild Rift community - website version 1.1
+            </p>
             <div className="flex gap-4">
               <a href="#" className="hover:text-red-400 transition">
                 Privacy Policy

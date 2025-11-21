@@ -204,9 +204,12 @@ export default function NewsPage() {
                 className="absolute top-3 right-3 p-2 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white rounded-lg transition"
                 title="Xóa bài viết"
               >
-                🗑️
+                <i className="fa-regular fa-trash-can"></i>
               </button>
             )}
+            {/* <button className="absolute top-3 right-12 p-2 bg-red-100 hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg transition">
+              <i className="fa-solid fa-pen-to-square"></i>
+            </button> */}
           </div>
         ))}
       </div>

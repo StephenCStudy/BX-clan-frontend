@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { http } from "../../utils/http";
@@ -44,11 +44,21 @@ export default function MessagesPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const selectedUserRef = useRef<string | null>(null);
 
   const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
+
+  useEffect(() => {
+    selectedUserRef.current = selectedUserId;
+  }, [selectedUserId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   // Check if user is admin
   useEffect(() => {
@@ -62,22 +72,64 @@ export default function MessagesPage() {
     }
   }, [user, navigate]);
 
-  // Load conversations
-  useEffect(() => {
+  const loadConversations = useCallback(async () => {
     if (!user) return;
-
-    setLoading(true);
-    http
-      .get("/private-messages/conversations")
-      .then((res) => {
-        setConversations(res.data || []);
-        if (res.data && res.data.length > 0) {
-          setSelectedUserId(res.data[0].user._id);
-        }
-      })
-      .catch(() => toast.error("Lỗi tải danh sách tin nhắn"))
-      .finally(() => setLoading(false));
+    setConversationsLoading(true);
+    try {
+      const res = await http.get("/private-messages/conversations");
+      const sorted: Conversation[] = [...(res.data || [])].sort(
+        (a, b) =>
+          new Date(b.lastMessageAt).getTime() -
+          new Date(a.lastMessageAt).getTime()
+      );
+      setConversations(sorted);
+      const current = selectedUserRef.current;
+      if (!current && sorted.length > 0) {
+        setSelectedUserId(sorted[0].user._id);
+      } else if (
+        current &&
+        !sorted.some((c) => c.user._id === current)
+      ) {
+        setSelectedUserId(sorted[0]?.user._id || null);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi tải danh sách tin nhắn");
+      setConversations([]);
+    } finally {
+      setConversationsLoading(false);
+    }
   }, [user]);
+
+  const loadMessages = useCallback(
+    async (partnerId: string) => {
+      if (!partnerId || !user) return;
+      setMessagesLoading(true);
+      try {
+        const res = await http.get(
+          `/private-messages/conversation/${partnerId}`
+        );
+        setMessages(res.data || []);
+      } catch {
+        setMessages([]);
+      } finally {
+        setMessagesLoading(false);
+      }
+    },
+    [user]
+  );
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  useEffect(() => {
+    if (selectedUserId) {
+      loadMessages(selectedUserId);
+    } else {
+      setMessages([]);
+    }
+  }, [selectedUserId, loadMessages]);
 
   // Setup socket
   useEffect(() => {
@@ -86,60 +138,44 @@ export default function MessagesPage() {
     const s = io(SOCKET_URL);
     s.emit("user:join", user.id);
 
-    s.on("private:receive", (msg: Message) => {
-      // Add to messages if it's the current conversation
+    const appendIfActive = (msg: Message) => {
+      const current = selectedUserRef.current;
       if (
-        selectedUserId &&
-        (msg.from._id === selectedUserId || msg.to._id === selectedUserId)
+        current &&
+        (msg.from._id === current || msg.to._id === current)
       ) {
         setMessages((prev) => [...prev, msg]);
       }
+    };
 
-      // Refresh conversations list to update unread count
-      http.get("/private-messages/conversations").then((res) => {
-        setConversations(res.data || []);
-      });
-    });
+    const handleReceive = (msg: Message) => {
+      appendIfActive(msg);
+      loadConversations();
+    };
 
-    s.on("private:sent", (msg: Message) => {
-      setMessages((prev) => [...prev, msg]);
-    });
+    s.on("private:receive", handleReceive);
+    s.on("private:sent", appendIfActive);
 
     socketRef.current = s;
 
     return () => {
+      s.off("private:receive", handleReceive);
+      s.off("private:sent", appendIfActive);
       s.disconnect();
     };
-  }, [SOCKET_URL, user, selectedUserId]);
-
-  // Load conversation when user is selected
-  useEffect(() => {
-    if (!selectedUserId || !user) return;
-
-    http
-      .get(`/private-messages/conversation/${selectedUserId}`)
-      .then((res) => {
-        setMessages(res.data || []);
-        // Scroll to bottom
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        }, 100);
-      })
-      .catch(() => {
-        setMessages([]);
-      });
-  }, [selectedUserId, user]);
+  }, [SOCKET_URL, user, loadConversations]);
 
   const sendMessage = () => {
-    if (!text.trim() || !selectedUserId || !socketRef.current) return;
+    if (!text.trim() || !selectedUserId || !socketRef.current || !user) return;
 
     socketRef.current.emit("private:send", {
-      from: user?.id,
+      from: user.id,
       to: selectedUserId,
-      message: text,
+      message: text.trim(),
       fromUser: user,
     });
     setText("");
+    loadConversations();
   };
 
   if (!user) return null;
@@ -171,7 +207,7 @@ export default function MessagesPage() {
                 <h2 className="text-lg font-bold text-gray-900 mb-3">
                   Cuộc trò chuyện
                 </h2>
-                {loading ? (
+                {conversationsLoading ? (
                   <div className="text-center py-8 text-gray-500">
                     Đang tải...
                   </div>
@@ -262,7 +298,11 @@ export default function MessagesPage() {
                     className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50"
                     style={{ maxHeight: "calc(100vh - 450px)" }}
                   >
-                    {messages.length === 0 ? (
+                    {messagesLoading ? (
+                      <div className="text-center py-8 text-gray-500">
+                        Đang tải tin nhắn...
+                      </div>
+                    ) : messages.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
                         <p>Chưa có tin nhắn</p>
                       </div>
@@ -332,10 +372,12 @@ export default function MessagesPage() {
                         }}
                         className="flex-1 p-3 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
                         placeholder="Nhập tin nhắn..."
+                        disabled={!selectedUserId}
                       />
                       <button
                         onClick={sendMessage}
-                        className="px-5 py-3 rounded-lg text-white text-sm bg-red-600 hover:bg-red-700 shadow-lg font-semibold"
+                        disabled={!text.trim() || !selectedUserId}
+                        className="px-5 py-3 rounded-lg text-white text-sm bg-red-600 hover:bg-red-700 shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Gửi
                       </button>

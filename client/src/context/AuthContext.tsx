@@ -4,9 +4,11 @@ import axios from "axios";
 interface User {
   id: string;
   username: string;
-  ingameName: string;
+  ingameName?: string;
   role: string;
   avatarUrl?: string;
+  rank?: string;
+  lane?: string;
 }
 
 interface AuthContextType {
@@ -15,9 +17,20 @@ interface AuthContextType {
   login: (token: string, userData: User) => void;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const formatUser = (data: any): User => ({
+  id: data?.id || data?._id || "",
+  username: data?.username || "",
+  ingameName: data?.ingameName,
+  role: data?.role || "member",
+  avatarUrl: data?.avatarUrl,
+  rank: data?.rank,
+  lane: data?.lane,
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -31,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .get(`${API}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        .then((res) => setUser(res.data))
+        .then((res) => setUser(formatUser(res.data)))
         .catch(() => localStorage.removeItem("token"))
         .finally(() => setLoading(false));
     } else {
@@ -41,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = (token: string, userData: User) => {
     localStorage.setItem("token", token);
-    setUser(userData);
+    setUser(formatUser(userData));
   };
 
   const logout = () => {
@@ -57,15 +70,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await axios.get(`${API}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setUser(res.data);
+        setUser(formatUser(res.data));
       } catch {
         logout();
       }
     }
   };
 
+  const updateUser = (updates: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, logout, refreshUser, updateUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

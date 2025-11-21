@@ -111,10 +111,6 @@ export default function CustomsPage() {
 
   const createCustom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedMembers.length !== 10) {
-      toast.error("Phải chọn đúng 10 người chơi");
-      return;
-    }
     try {
       await http.post("/customs", {
         ...form,
@@ -335,7 +331,7 @@ export default function CustomsPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs md:text-sm text-gray-700 font-medium">
-                  Chọn người chơi ({selectedMembers.length}/10)
+                  Chọn người chơi ({selectedMembers.length}/10) - có thể thêm sau
                 </label>
                 <button
                   type="button"
