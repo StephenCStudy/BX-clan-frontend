@@ -97,7 +97,7 @@ export default function Footer() {
                   </p>
                   <div className="flex gap-2 mt-2">
                     <a
-                      href="https://github.com/StephenCStudy/BX-clan"
+                      href="https://github.com/StephenCStudy"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 transition-fast text-[10px] font-semibold"
@@ -132,7 +132,7 @@ export default function Footer() {
                   </p>
                   <div className="flex gap-2 mt-2">
                     <a
-                      href="https://github.com/StephenCStudy/BX-clan"
+                      href="https://github.com/viesoftware/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 transition-fast text-[10px] font-semibold"
@@ -140,7 +140,7 @@ export default function Footer() {
                       <i className="fa-brands fa-github"></i> GitHub
                     </a>
                     <a
-                      href="https://www.facebook.com/stephen.uc.2025/"
+                      href="https://www.facebook.com/man.pro.ok#"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 transition-fast text-[10px] font-semibold"
@@ -162,11 +162,23 @@ export default function Footer() {
               Rift community - website version 1.2.0
             </p>
             <div className="flex gap-4">
-              <a href="#" className="hover:text-red-400 transition-fast">
+              <a
+                href="https://www.riotgames.com/vi/terms-of-service?"
+                className="hover:text-red-400 transition-fast"
+              >
                 Privacy Policy
               </a>
-              <a href="#" className="hover:text-red-400 transition-fast">
+              <a
+                href="https://www.riotgames.com/vi/legal/privacy-notice"
+                className="hover:text-red-400 transition-fast"
+              >
                 Terms of Service
+              </a>
+              <a
+                href="https://github.com/StephenCStudy/BX-clan"
+                className="hover:text-red-400 transition-fast"
+              >
+                Source Code
               </a>
             </div>
           </div>
