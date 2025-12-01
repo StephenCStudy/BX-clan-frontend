@@ -37,6 +37,15 @@ type UserNotification = {
   message: string;
   isRead: boolean;
   createdAt: string;
+  relatedNews?: { _id: string; title: string };
+  relatedCustomRoom?: { _id: string };
+};
+
+type NewsItem = {
+  _id: string;
+  title: string;
+  content: string;
+  createdAt: string;
 };
 
 type EditModalProps = {
@@ -278,10 +287,13 @@ export default function ProfilePage() {
   const [text, setText] = useState("");
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const selectedAdminRef = useRef<string | null>(null);
+  const prevMessagesLengthRef = useRef<number>(0);
+  const isInitialLoadRef = useRef<boolean>(true);
   const SOCKET_URL = useMemo(
     () => import.meta.env.VITE_SOCKET_URL || "http://localhost:5000",
     []
@@ -361,19 +373,21 @@ export default function ProfilePage() {
     [user]
   );
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!text.trim() || !selectedAdmin || !user) return;
-    if (!socketRef.current) {
-      toast.error("Không thể kết nối máy chủ tin nhắn");
-      return;
+    try {
+      const res = await http.post("/private-messages/send", {
+        to: selectedAdmin,
+        message: text.trim(),
+      });
+      // Add message to local state
+      setMessages((prev) => [...prev, res.data]);
+      setText("");
+      toast.success("Đã gửi tin nhắn");
+    } catch (err) {
+      console.error("Send message error:", err);
+      toast.error("Lỗi gửi tin nhắn");
     }
-    socketRef.current.emit("private:send", {
-      from: user.id,
-      to: selectedAdmin,
-      message: text.trim(),
-      fromUser: user,
-    });
-    setText("");
   };
 
   useEffect(() => {
@@ -389,8 +403,22 @@ export default function ProfilePage() {
     selectedAdminRef.current = selectedAdmin || null;
   }, [selectedAdmin]);
 
+  // Only scroll to bottom when new messages are added (not on initial load)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isInitialLoadRef.current) {
+      // First load - don't scroll, just update the ref
+      if (messages.length > 0) {
+        prevMessagesLengthRef.current = messages.length;
+        isInitialLoadRef.current = false;
+      }
+      return;
+    }
+
+    // Only scroll if messages were added (not on initial conversation load)
+    if (messages.length > prevMessagesLengthRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
   useEffect(() => {
@@ -415,6 +443,15 @@ export default function ProfilePage() {
       .get("/notifications")
       .then((res) => {
         setNotifications(res.data || []);
+      })
+      .catch(() => {});
+
+    // Load news
+    http
+      .get("/news")
+      .then((res) => {
+        const items = res.data?.items || res.data || [];
+        setNews(items.slice(0, 5)); // Latest 5 news
       })
       .catch(() => {});
   }, []);
@@ -448,6 +485,8 @@ export default function ProfilePage() {
   // Load conversation when admin selection changes
   useEffect(() => {
     if (!selectedAdmin) return;
+    isInitialLoadRef.current = true;
+    prevMessagesLengthRef.current = 0;
     loadConversation(selectedAdmin);
   }, [selectedAdmin, loadConversation]);
 
@@ -465,7 +504,7 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-5 md:p-6">
+    <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
       <div className="relative mb-6 md:mb-8">
         <div className="h-48 rounded-2xl bg-linear-to-r from-rose-500 via-red-600 to-orange-500 shadow-2xl overflow-hidden">
           <div className="h-full w-full flex items-center justify-between px-6 bg-linear-to-b from-transparent to-black/20">
@@ -812,6 +851,7 @@ export default function ProfilePage() {
         open={showNotifications}
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
+        news={news}
         onMarkRead={handleMarkNotificationRead}
         onDelete={handleDeleteNotification}
       />

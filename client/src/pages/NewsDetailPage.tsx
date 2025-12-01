@@ -73,7 +73,7 @@ export default function NewsDetailPage() {
   const isRoomCreation = news.type === "room-creation";
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="w-full max-w-screen-lg mx-auto px-4 md:px-6 lg:px-8 py-6">
       <div className="mb-4">
         <BackButton />
       </div>

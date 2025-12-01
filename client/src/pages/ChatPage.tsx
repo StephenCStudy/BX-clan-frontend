@@ -43,7 +43,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
+    <div className="w-full max-w-5xl mx-auto px-4 md:px-6 lg:px-8 py-4">
       <h1 className="text-3xl font-bold text-red-600 mb-4">💬 Clan Chat</h1>
       <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4">
         <div className="h-96 overflow-y-auto mb-4 space-y-2 bg-gray-50 rounded p-3">

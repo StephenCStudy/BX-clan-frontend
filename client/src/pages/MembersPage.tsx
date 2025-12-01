@@ -41,7 +41,12 @@ export default function MembersPage() {
   }, []);
 
   if (loading)
-    return <div className="text-center py-10 text-gray-600">Đang tải...</div>;
+    return (
+      <div className="text-center py-10 text-gray-600 animate-fade-in">
+        <div className="inline-block w-12 h-12 border-4 border-gray-200 border-t-red-600 rounded-full animate-rotate gpu-accelerated mb-4"></div>
+        <p className="animate-pulse">Đang tải...</p>
+      </div>
+    );
 
   const canManage =
     user &&
@@ -175,30 +180,31 @@ export default function MembersPage() {
   const pageItems = sorted.slice(start, start + PAGE_SIZE);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6">
-      <div className="flex flex-row items-center justify-between gap-2 mb-6">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-red-600">
+    <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 animate-fade-in gpu-accelerated">
+      <div className="flex flex-row items-center justify-between gap-2 mb-6 animate-fade-in-down">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-red-600 flex items-center gap-2">
+          <span className="animate-pulse">👥</span>
           Thành viên Clan ({members.length})
         </h1>
         {(user?.role === "leader" || user?.role === "organizer") && (
           <div className="flex flex-row gap-2">
             <button
               onClick={exportMembers}
-              className="px-2 md:px-3 py-1 md:py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs md:text-sm font-semibold shadow"
+              className="px-2 md:px-3 py-1 md:py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs md:text-sm font-semibold shadow transition-smooth hover-lift gpu-accelerated"
               title="Xuất Excel"
             >
               <i className="fa-solid fa-download"></i>
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-2 md:px-3 py-1 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs md:text-sm font-semibold shadow"
+              className="px-2 md:px-3 py-1 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs md:text-sm font-semibold shadow transition-smooth hover-lift gpu-accelerated"
               title="Nhập dữ liệu từ Excel"
             >
               <i className="fa-solid fa-upload"></i>
             </button>
             <Link
               to="/admin"
-              className="px-2 md:px-3 py-1 md:py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs md:text-sm font-semibold shadow"
+              className="px-2 md:px-3 py-1 md:py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs md:text-sm font-semibold shadow transition-smooth hover-lift gpu-accelerated"
             >
               QL
             </Link>
@@ -214,7 +220,7 @@ export default function MembersPage() {
       </div>
 
       {/* Toolbar: search + role filter */}
-      <div className="mb-4 flex flex-row gap-2 items-center justify-between">
+      <div className="mb-4 flex flex-row gap-2 items-center justify-between animate-fade-in-up">
         <div className="flex-1 flex gap-2">
           <div className="relative flex-1 min-w-[220px]">
             <input
@@ -224,7 +230,7 @@ export default function MembersPage() {
                 setSearchParams({ page: "1" });
               }}
               placeholder="Tìm theo tên..."
-              className="w-full p-2 md:p-3 text-sm bg-white rounded-lg border-2 border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+              className="w-full p-2 md:p-3 text-sm bg-white rounded-lg border-2 border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
             />
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
               ⌕
@@ -236,7 +242,7 @@ export default function MembersPage() {
               setRoleFilter(e.target.value);
               setSearchParams({ page: "1" });
             }}
-            className="px-3 py-2 bg-white rounded-lg border-2 border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+            className="px-3 py-2 bg-white rounded-lg border-2 border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
           >
             <option value="all">Tất cả vai trò</option>
             <option value="leader">Trưởng Clan</option>
@@ -250,7 +256,7 @@ export default function MembersPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto bg-white rounded-xl border-2 border-gray-200 shadow-sm">
+      <div className="overflow-x-auto bg-white rounded-xl border-2 border-gray-200 shadow-sm animate-scale-in gpu-accelerated">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -281,13 +287,16 @@ export default function MembersPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {pageItems.map((m) => (
-              <tr key={m._id} className="hover:bg-gray-50">
+              <tr
+                key={m._id}
+                className="hover:bg-gray-50 transition-smooth hover-lift stagger-item gpu-accelerated"
+              >
                 <td className="px-2 md:px-3 py-2 md:py-3 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     <img
                       src={m.avatarUrl || "https://placehold.co/64x64"}
                       alt={m.username}
-                      className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border-2 border-red-600"
+                      className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border-2 border-red-600 hover-grow transition-smooth gpu-accelerated"
                     />
                     <div>
                       <div className="font-semibold text-gray-900 text-xs md:text-sm">
@@ -322,14 +331,14 @@ export default function MembersPage() {
                     <div className="flex items-center justify-end gap-1 sm:gap-2">
                       <button
                         onClick={() => viewMember(m)}
-                        className="px-2 md:px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs md:text-sm font-medium transition"
+                        className="px-2 md:px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs md:text-sm font-medium transition-smooth hover-lift gpu-accelerated"
                         title="Xem chi tiết"
                       >
                         <i className="fa-regular fa-eye"></i> Xem
                       </button>
                       <button
                         onClick={() => setConfirmKick(m)}
-                        className="px-2 md:px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs md:text-sm font-semibold transition"
+                        className="px-2 md:px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs md:text-sm font-semibold transition-smooth hover-shrink gpu-accelerated"
                         title="Kick khỏi clan"
                       >
                         <i className="fa-solid fa-ban"></i> Kick
@@ -344,7 +353,7 @@ export default function MembersPage() {
       </div>
 
       {/* Pagination */}
-      <div className="mt-4 flex items-center justify-center gap-2">
+      <div className="mt-4 flex items-center justify-center gap-2 animate-fade-in-up">
         <button
           disabled={currentPage <= 1}
           onClick={() =>

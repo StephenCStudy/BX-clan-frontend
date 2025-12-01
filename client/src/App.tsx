@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import ScrollToTop from "./components/ScrollToTop";
 import ProtectedRoute from "./components/ProtectedRoute";
 import HomePage from "./pages/home/HomePage";
 import LoginPage from "./pages/auth/LoginPage";
@@ -22,12 +23,12 @@ import RegistrationPage from "./pages/RegistrationPage";
 
 // vercel / render reload backend ping helper
 export default function App() {
-
   return (
     <AuthProvider>
-      <div className="min-h-screen flex flex-col bg-white text-gray-900">
+      <div className="app-container min-h-screen flex flex-col bg-white text-gray-900">
+        <ScrollToTop />
         <Header />
-        <main className="flex-1">
+        <main className="main-content flex-1">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />

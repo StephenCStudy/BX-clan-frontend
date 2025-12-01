@@ -46,9 +46,14 @@ export default function MessagesPage() {
   const [text, setText] = useState("");
   const [conversationsLoading, setConversationsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [showNewMessageModal, setShowNewMessageModal] = useState(false);
+  const [allMembers, setAllMembers] = useState<any[]>([]);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const selectedUserRef = useRef<string | null>(null);
+  const prevMessagesLengthRef = useRef<number>(0);
+  const isInitialLoadRef = useRef<boolean>(true);
 
   const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
@@ -56,8 +61,22 @@ export default function MessagesPage() {
     selectedUserRef.current = selectedUserId;
   }, [selectedUserId]);
 
+  // Only scroll to bottom when new messages are added (not on initial load)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isInitialLoadRef.current) {
+      // First load - don't scroll, just update the ref
+      if (messages.length > 0) {
+        prevMessagesLengthRef.current = messages.length;
+        isInitialLoadRef.current = false;
+      }
+      return;
+    }
+
+    // Only scroll if messages were added (not on initial conversation load)
+    if (messages.length > prevMessagesLengthRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
   // Check if user is admin
@@ -86,10 +105,7 @@ export default function MessagesPage() {
       const current = selectedUserRef.current;
       if (!current && sorted.length > 0) {
         setSelectedUserId(sorted[0].user._id);
-      } else if (
-        current &&
-        !sorted.some((c) => c.user._id === current)
-      ) {
+      } else if (current && !sorted.some((c) => c.user._id === current)) {
         setSelectedUserId(sorted[0]?.user._id || null);
       }
     } catch (err) {
@@ -121,10 +137,19 @@ export default function MessagesPage() {
 
   useEffect(() => {
     loadConversations();
+    // Load all members for new message modal
+    http
+      .get("/members")
+      .then((res) => {
+        setAllMembers(res.data || []);
+      })
+      .catch(() => {});
   }, [loadConversations]);
 
   useEffect(() => {
     if (selectedUserId) {
+      isInitialLoadRef.current = true;
+      prevMessagesLengthRef.current = 0;
       loadMessages(selectedUserId);
     } else {
       setMessages([]);
@@ -140,10 +165,7 @@ export default function MessagesPage() {
 
     const appendIfActive = (msg: Message) => {
       const current = selectedUserRef.current;
-      if (
-        current &&
-        (msg.from._id === current || msg.to._id === current)
-      ) {
+      if (current && (msg.from._id === current || msg.to._id === current)) {
         setMessages((prev) => [...prev, msg]);
       }
     };
@@ -165,17 +187,27 @@ export default function MessagesPage() {
     };
   }, [SOCKET_URL, user, loadConversations]);
 
-  const sendMessage = () => {
-    if (!text.trim() || !selectedUserId || !socketRef.current || !user) return;
+  const sendMessage = async () => {
+    if (!text.trim() || !selectedUserId || !user) return;
+    try {
+      const res = await http.post("/private-messages/send", {
+        to: selectedUserId,
+        message: text.trim(),
+      });
+      setMessages((prev) => [...prev, res.data]);
+      setText("");
+      loadConversations();
+      toast.success("Đã gửi tin nhắn");
+    } catch (err) {
+      console.error("Send message error:", err);
+      toast.error("Lỗi gửi tin nhắn");
+    }
+  };
 
-    socketRef.current.emit("private:send", {
-      from: user.id,
-      to: selectedUserId,
-      message: text.trim(),
-      fromUser: user,
-    });
-    setText("");
-    loadConversations();
+  const selectMemberForNewConversation = (memberId: string) => {
+    setSelectedUserId(memberId);
+    setShowNewMessageModal(false);
+    setMemberSearchQuery("");
   };
 
   if (!user) return null;
@@ -183,6 +215,10 @@ export default function MessagesPage() {
   const selectedConversation = conversations.find(
     (c) => c.user._id === selectedUserId
   );
+
+  // Tìm thông tin user được chọn từ allMembers nếu không có trong conversations
+  const selectedMember = allMembers.find((m) => m._id === selectedUserId);
+  const selectedUserInfo = selectedConversation?.user || selectedMember;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -204,9 +240,17 @@ export default function MessagesPage() {
               style={{ maxHeight: "calc(100vh - 300px)" }}
             >
               <div className="p-4">
-                <h2 className="text-lg font-bold text-gray-900 mb-3">
-                  Cuộc trò chuyện
-                </h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Cuộc trò chuyện
+                  </h2>
+                  <button
+                    onClick={() => setShowNewMessageModal(true)}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition"
+                  >
+                    ✉️ Gửi tin nhắn
+                  </button>
+                </div>
                 {conversationsLoading ? (
                   <div className="text-center py-8 text-gray-500">
                     Đang tải...
@@ -267,25 +311,25 @@ export default function MessagesPage() {
 
             {/* Messages Area */}
             <div className="md:col-span-2 flex flex-col">
-              {selectedUserId && selectedConversation ? (
+              {selectedUserId && selectedUserInfo ? (
                 <>
                   {/* Header */}
                   <div className="p-4 border-b-2 border-gray-200 bg-white">
                     <div className="flex items-center gap-3">
                       <img
                         src={
-                          selectedConversation.user.avatarUrl ||
+                          selectedUserInfo.avatarUrl ||
                           "https://placehold.co/40x40"
                         }
-                        alt={selectedConversation.user.username}
+                        alt={selectedUserInfo.username}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div>
                         <h3 className="font-bold text-gray-900">
-                          {selectedConversation.user.username}
+                          {selectedUserInfo.username}
                         </h3>
                         <p className="text-xs text-gray-500">
-                          {selectedConversation.user.role === "member"
+                          {selectedUserInfo.role === "member"
                             ? "👤 Thành viên"
                             : "👑 Admin"}
                         </p>
@@ -304,7 +348,7 @@ export default function MessagesPage() {
                       </div>
                     ) : messages.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
-                        <p>Chưa có tin nhắn</p>
+                        <p>Chưa có tin nhắn. Hãy bắt đầu cuộc trò chuyện!</p>
                       </div>
                     ) : (
                       messages.map((m) => {
@@ -395,6 +439,74 @@ export default function MessagesPage() {
             </div>
           </div>
         </div>
+
+        {/* New Message Modal */}
+        {showNewMessageModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+              <h3 className="text-xl font-bold text-red-600 mb-4">
+                ✉️ Gửi tin nhắn mới
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Chọn thành viên để bắt đầu cuộc trò chuyện
+              </p>
+
+              <input
+                type="text"
+                placeholder="Tìm kiếm theo tên..."
+                value={memberSearchQuery}
+                onChange={(e) => setMemberSearchQuery(e.target.value)}
+                className="w-full p-3 mb-4 text-sm rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+              />
+
+              <div className="space-y-2 mb-6">
+                {allMembers
+                  .filter((m) => {
+                    const matchesSearch = memberSearchQuery
+                      ? m.username
+                          .toLowerCase()
+                          .includes(memberSearchQuery.toLowerCase()) ||
+                        m.ingameName
+                          ?.toLowerCase()
+                          .includes(memberSearchQuery.toLowerCase())
+                      : true;
+                    return matchesSearch && m._id !== user?.id;
+                  })
+                  .map((member) => (
+                    <button
+                      key={member._id}
+                      onClick={() => selectMemberForNewConversation(member._id)}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-gray-200 hover:border-red-400 hover:bg-red-50 transition"
+                    >
+                      <img
+                        src={member.avatarUrl || "https://placehold.co/40x40"}
+                        alt={member.username}
+                        className="w-10 h-10 rounded-full"
+                      />
+                      <div className="flex-1 text-left">
+                        <div className="font-semibold text-gray-900">
+                          {member.username}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {member.ingameName || "Chưa có tên game"}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowNewMessageModal(false);
+                  setMemberSearchQuery("");
+                }}
+                className="w-full py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg font-semibold transition"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

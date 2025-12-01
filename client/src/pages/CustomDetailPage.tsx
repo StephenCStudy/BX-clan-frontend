@@ -78,8 +78,11 @@ export default function CustomDetailPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [allMembers, setAllMembers] = useState<any[]>([]);
-  const [selectedInvite, setSelectedInvite] = useState<string | null>(null);
+  const [selectedInvites, setSelectedInvites] = useState<string[]>([]);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [showTeamEditModal, setShowTeamEditModal] = useState(false);
+  const [editTeam1, setEditTeam1] = useState<any[]>([]);
+  const [editTeam2, setEditTeam2] = useState<any[]>([]);
   const gameModeOptions = [
     { value: "5vs5", label: "🗺️ 5vs5 - Summoner's Rift" },
     { value: "aram", label: "🌉 ARAM - Howling Abyss" },
@@ -107,6 +110,73 @@ export default function CustomDetailPage() {
   ];
 
   const canManage = user && user.role !== "member";
+
+  const removeMemberFromRoom = async (memberId: string) => {
+    if (!id) return;
+    try {
+      await http.delete(`/customs/${id}/members/${memberId}`);
+      toast.success("Đã xóa thành viên khỏi phòng");
+      // Reload custom data
+      const res = await http.get(`/customs/${id}`);
+      setCustom(res.data);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Lỗi xóa thành viên");
+    }
+  };
+
+  // Team editing functions
+  const openTeamEditModal = () => {
+    if (!custom) return;
+    setEditTeam1([...(custom.team1 || [])]);
+    setEditTeam2([...(custom.team2 || [])]);
+    setShowTeamEditModal(true);
+  };
+
+  const moveToTeam2 = (member: any) => {
+    if (editTeam2.length >= 5) {
+      toast.error("Đội Xanh đã đầy (5/5)");
+      return;
+    }
+    const memberId = member._id || member;
+    setEditTeam1((prev) =>
+      prev.filter((m) => (m.user?._id || m._id) !== memberId)
+    );
+    setEditTeam2((prev) => [...prev, { user: member }]);
+  };
+
+  const moveToTeam1 = (member: any) => {
+    if (editTeam1.length >= 5) {
+      toast.error("Đội Đỏ đã đầy (5/5)");
+      return;
+    }
+    const memberId = member._id || member;
+    setEditTeam2((prev) =>
+      prev.filter((m) => (m.user?._id || m._id) !== memberId)
+    );
+    setEditTeam1((prev) => [...prev, { user: member }]);
+  };
+
+  const saveTeamChanges = async () => {
+    if (!id) return;
+    try {
+      const team1Ids = editTeam1.map((m) => m.user?._id || m._id);
+      const team2Ids = editTeam2.map((m) => m.user?._id || m._id);
+
+      await http.put(`/customs/${id}/teams`, {
+        team1: team1Ids,
+        team2: team2Ids,
+      });
+
+      toast.success("Đã cập nhật đội hình!");
+      setShowTeamEditModal(false);
+
+      // Reload custom data
+      const res = await http.get(`/customs/${id}`);
+      setCustom(res.data);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Lỗi cập nhật đội hình");
+    }
+  };
 
   const loadMembers = async () => {
     try {
@@ -153,15 +223,65 @@ export default function CustomDetailPage() {
   };
 
   const sendInvite = async () => {
-    if (!selectedInvite || !id) return;
+    if (selectedInvites.length === 0 || !id) return;
+
+    // Tính số slot còn trống
+    const currentPlayers =
+      (custom?.team1?.length || 0) + (custom?.team2?.length || 0);
+    const maxAllowed = (custom?.maxPlayers || 10) - currentPlayers;
+
+    if (selectedInvites.length > maxAllowed) {
+      toast.error(`Chỉ còn ${maxAllowed} chỗ trống trong phòng`);
+      return;
+    }
+
     try {
-      await http.post(`/customs/${id}/invite`, { userId: selectedInvite });
-      toast.success("Đã gửi lời mời!");
+      // Gửi lời mời cho từng người được chọn
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const userId of selectedInvites) {
+        try {
+          await http.post(`/customs/${id}/invite`, { userId });
+          successCount++;
+        } catch (err: any) {
+          errorCount++;
+          console.error(`Failed to invite ${userId}:`, err);
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Đã gửi ${successCount} lời mời!`);
+      }
+      if (errorCount > 0) {
+        toast.error(`${errorCount} lời mời thất bại`);
+      }
+
       setShowInviteModal(false);
-      setSelectedInvite(null);
+      setSelectedInvites([]);
+      loadPendingInvites();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Lỗi gửi lời mời");
     }
+  };
+
+  const toggleInviteSelection = (memberId: string) => {
+    const currentPlayers =
+      (custom?.team1?.length || 0) + (custom?.team2?.length || 0);
+    const maxAllowed =
+      (custom?.maxPlayers || 10) - currentPlayers - pendingInvites.length;
+
+    setSelectedInvites((prev) => {
+      if (prev.includes(memberId)) {
+        return prev.filter((id) => id !== memberId);
+      } else {
+        if (prev.length >= maxAllowed) {
+          toast.error(`Chỉ có thể mời tối đa ${maxAllowed} người nữa`);
+          return prev;
+        }
+        return [...prev, memberId];
+      }
+    });
   };
 
   const loadChat = async () => {
@@ -554,14 +674,26 @@ export default function CustomDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Team Formation */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                ⚔️ Đội hình thi đấu
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-800">
+                  ⚔️ Đội hình thi đấu
+                </h2>
+                {canManage && (teamA.length > 0 || teamB.length > 0) && (
+                  <button
+                    onClick={openTeamEditModal}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold"
+                  >
+                    ✏️ Chỉnh sửa đội
+                  </button>
+                )}
+              </div>
               <div className="grid md:grid-cols-2 gap-4">
                 {/* Team A */}
                 <div className="bg-red-50 rounded-lg p-4 border-2 border-red-200">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-red-700">🔴 ĐỘI ĐỎ</h3>
+                    <h3 className="font-bold text-red-700">
+                      🔴 ĐỘI ĐỎ ({teamA.length}/5)
+                    </h3>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold text-red-700">
                         {team1Score}
@@ -589,27 +721,39 @@ export default function CustomDetailPage() {
                   <div className="space-y-2">
                     {teamA.length > 0 ? (
                       teamA.map((member: any) => {
-                        const user = member.user || member;
+                        const memberUser = member.user || member;
                         return (
                           <div
-                            key={user._id}
+                            key={memberUser._id}
                             className="flex items-center gap-2 bg-white p-2 rounded"
                           >
                             <img
                               src={
-                                user.avatarUrl || "https://placehold.co/40x40"
+                                memberUser.avatarUrl ||
+                                "https://placehold.co/40x40"
                               }
                               alt=""
                               className="w-8 h-8 rounded-full"
                             />
-                            <div className="flex-1">
-                              <div className="font-semibold text-sm">
-                                {user.username}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm truncate">
+                                {memberUser.username}
                               </div>
-                              <div className="text-xs text-gray-500">
-                                {user.ingameName}
+                              <div className="text-xs text-gray-500 truncate">
+                                {memberUser.ingameName}
                               </div>
                             </div>
+                            {canManage && (
+                              <button
+                                onClick={() =>
+                                  removeMemberFromRoom(memberUser._id)
+                                }
+                                className="p-1 text-red-500 hover:bg-red-100 rounded"
+                                title="Xóa khỏi phòng"
+                              >
+                                ✕
+                              </button>
+                            )}
                           </div>
                         );
                       })
@@ -624,7 +768,9 @@ export default function CustomDetailPage() {
                 {/* Team B */}
                 <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-blue-700">🔵 ĐỘI XANH</h3>
+                    <h3 className="font-bold text-blue-700">
+                      🔵 ĐỘI XANH ({teamB.length}/5)
+                    </h3>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold text-blue-700">
                         {team2Score}
@@ -652,27 +798,39 @@ export default function CustomDetailPage() {
                   <div className="space-y-2">
                     {teamB.length > 0 ? (
                       teamB.map((member: any) => {
-                        const user = member.user || member;
+                        const memberUser = member.user || member;
                         return (
                           <div
-                            key={user._id}
+                            key={memberUser._id}
                             className="flex items-center gap-2 bg-white p-2 rounded"
                           >
                             <img
                               src={
-                                user.avatarUrl || "https://placehold.co/40x40"
+                                memberUser.avatarUrl ||
+                                "https://placehold.co/40x40"
                               }
                               alt=""
                               className="w-8 h-8 rounded-full"
                             />
-                            <div className="flex-1">
-                              <div className="font-semibold text-sm">
-                                {user.username}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm truncate">
+                                {memberUser.username}
                               </div>
-                              <div className="text-xs text-gray-500">
-                                {user.ingameName}
+                              <div className="text-xs text-gray-500 truncate">
+                                {memberUser.ingameName}
                               </div>
                             </div>
+                            {canManage && (
+                              <button
+                                onClick={() =>
+                                  removeMemberFromRoom(memberUser._id)
+                                }
+                                className="p-1 text-red-500 hover:bg-red-100 rounded"
+                                title="Xóa khỏi phòng"
+                              >
+                                ✕
+                              </button>
+                            )}
                           </div>
                         );
                       })
@@ -1055,9 +1213,6 @@ export default function CustomDetailPage() {
                       const memberUser = member.user || member;
                       const teamLabel =
                         index < teamA.length ? "🔴 Đội Đỏ" : "🔵 Đội Xanh";
-                      function removeMemberFromRoom(_id: any): void {
-                        throw new Error("Function not implemented.");
-                      }
 
                       return (
                         <div
@@ -1115,9 +1270,6 @@ export default function CustomDetailPage() {
                       const memberUser = member.user || member;
                       const teamLabel =
                         index < teamA.length ? "🔴 Đội Đỏ" : "🔵 Đội Xanh";
-                      function removeMemberFromRoom(_id: any): void {
-                        throw new Error("Function not implemented.");
-                      }
 
                       return (
                         <div
@@ -1177,26 +1329,58 @@ export default function CustomDetailPage() {
                 ✉️ Mời thành viên
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                Chọn thành viên để gửi lời mời tham gia phòng
+                Chọn thành viên để gửi lời mời tham gia phòng (có thể chọn
+                nhiều)
               </p>
+              <div className="mt-2 text-sm">
+                <span className="text-blue-600 font-semibold">
+                  Đã chọn: {selectedInvites.length}
+                </span>
+                <span className="text-gray-500 ml-2">
+                  / Còn trống:{" "}
+                  {(custom?.maxPlayers || 10) -
+                    (custom?.team1?.length || 0) -
+                    (custom?.team2?.length || 0) -
+                    pendingInvites.length}{" "}
+                  chỗ
+                </span>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-2">
-              {allMembers
-                .filter((m) => {
-                  // Filter out members already in room
-                  const allPlayers = [
-                    ...(custom?.team1 || []),
-                    ...(custom?.team2 || []),
-                    ...(custom?.players || []),
-                  ];
-                  return !allPlayers.some((p: any) => (p._id || p) === m._id);
-                })
-                .map((member) => (
+              {(() => {
+                // Lọc ra những thành viên chưa ở trong phòng và chưa được mời
+                const allPlayersIds = [
+                  ...(custom?.team1 || []).map((p: any) => p._id || p),
+                  ...(custom?.team2 || []).map((p: any) => p._id || p),
+                  ...(custom?.players || []).map((p: any) => p._id || p),
+                ];
+                const pendingInviteUserIds = pendingInvites.map(
+                  (inv: any) => inv.user?._id
+                );
+
+                const availableMembers = allMembers.filter((m) => {
+                  // Loại bỏ những người đã trong phòng
+                  if (allPlayersIds.includes(m._id)) return false;
+                  // Loại bỏ những người đã được mời (pending)
+                  if (pendingInviteUserIds.includes(m._id)) return false;
+                  return true;
+                });
+
+                if (availableMembers.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="text-4xl mb-2">📭</div>
+                      <p>Không còn thành viên nào để mời</p>
+                    </div>
+                  );
+                }
+
+                return availableMembers.map((member) => (
                   <button
                     key={member._id}
-                    onClick={() => setSelectedInvite(member._id)}
+                    onClick={() => toggleInviteSelection(member._id)}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition ${
-                      selectedInvite === member._id
+                      selectedInvites.includes(member._id)
                         ? "bg-blue-50 border-blue-500"
                         : "bg-gray-50 border-gray-200 hover:border-gray-300"
                     }`}
@@ -1214,24 +1398,25 @@ export default function CustomDetailPage() {
                         {member.ingameName || "Chưa có tên game"}
                       </div>
                     </div>
-                    {selectedInvite === member._id && (
-                      <span className="text-blue-600 font-bold">✓</span>
+                    {selectedInvites.includes(member._id) && (
+                      <span className="text-blue-600 font-bold text-xl">✓</span>
                     )}
                   </button>
-                ))}
+                ));
+              })()}
             </div>
             <div className="p-6 border-t border-gray-200 flex gap-2">
               <button
                 onClick={sendInvite}
-                disabled={!selectedInvite}
+                disabled={selectedInvites.length === 0}
                 className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition"
               >
-                Gửi lời mời
+                Gửi lời mời ({selectedInvites.length})
               </button>
               <button
                 onClick={() => {
                   setShowInviteModal(false);
-                  setSelectedInvite(null);
+                  setSelectedInvites([]);
                 }}
                 className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition"
               >
@@ -1251,6 +1436,132 @@ export default function CustomDetailPage() {
         onConfirm={deleteCustom}
         onClose={() => setConfirmOpen(false)}
       />
+
+      {/* Team Edit Modal */}
+      {showTeamEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div
+            className="bg-white rounded-xl max-w-2xl w-full flex flex-col"
+            style={{ maxHeight: "85vh" }}
+          >
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">
+                ✏️ Chỉnh sửa đội hình
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Kéo thả hoặc click để chuyển thành viên giữa 2 đội
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Edit Team 1 */}
+                <div className="bg-red-50 rounded-lg p-4 border-2 border-red-200">
+                  <h4 className="font-bold text-red-700 mb-3">
+                    🔴 ĐỘI ĐỎ ({editTeam1.length}/5)
+                  </h4>
+                  <div className="space-y-2 min-h-[200px]">
+                    {editTeam1.map((member: any) => {
+                      const memberUser = member.user || member;
+                      return (
+                        <div
+                          key={memberUser._id}
+                          className="flex items-center gap-2 bg-white p-2 rounded border border-red-200"
+                        >
+                          <img
+                            src={
+                              memberUser.avatarUrl ||
+                              "https://placehold.co/32x32"
+                            }
+                            alt=""
+                            className="w-8 h-8 rounded-full"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm truncate">
+                              {memberUser.username}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => moveToTeam2(memberUser)}
+                            disabled={editTeam2.length >= 5}
+                            className="px-2 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white rounded text-xs font-semibold"
+                            title="Chuyển sang Đội Xanh"
+                          >
+                            → Xanh
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {editTeam1.length === 0 && (
+                      <div className="text-center text-gray-400 py-4">
+                        Trống
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Edit Team 2 */}
+                <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
+                  <h4 className="font-bold text-blue-700 mb-3">
+                    🔵 ĐỘI XANH ({editTeam2.length}/5)
+                  </h4>
+                  <div className="space-y-2 min-h-[200px]">
+                    {editTeam2.map((member: any) => {
+                      const memberUser = member.user || member;
+                      return (
+                        <div
+                          key={memberUser._id}
+                          className="flex items-center gap-2 bg-white p-2 rounded border border-blue-200"
+                        >
+                          <button
+                            onClick={() => moveToTeam1(memberUser)}
+                            disabled={editTeam1.length >= 5}
+                            className="px-2 py-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white rounded text-xs font-semibold"
+                            title="Chuyển sang Đội Đỏ"
+                          >
+                            Đỏ ←
+                          </button>
+                          <img
+                            src={
+                              memberUser.avatarUrl ||
+                              "https://placehold.co/32x32"
+                            }
+                            alt=""
+                            className="w-8 h-8 rounded-full"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm truncate">
+                              {memberUser.username}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {editTeam2.length === 0 && (
+                      <div className="text-center text-gray-400 py-4">
+                        Trống
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex gap-2">
+              <button
+                onClick={saveTeamChanges}
+                className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition"
+              >
+                💾 Lưu thay đổi
+              </button>
+              <button
+                onClick={() => setShowTeamEditModal(false)}
+                className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition"
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -24,13 +24,13 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   };
 
   const content = (
-    <div className="flex flex-col items-center justify-center gap-4">
+    <div className="flex flex-col items-center justify-center gap-4 animate-fade-in gpu-accelerated">
       <div
-        className={`${sizeClasses[size]} border-4 border-(--color-pastel) border-t-(--color-primary) rounded-full animate-spin`}
+        className={`${sizeClasses[size]} border-4 border-gray-200 border-t-red-600 rounded-full animate-rotate gpu-accelerated`}
       ></div>
       {text && (
         <p
-          className={`text-muted ${textSizes[size]} font-medium animate-pulse`}
+          className={`text-gray-600 ${textSizes[size]} font-medium animate-pulse`}
         >
           {text}
         </p>
@@ -40,7 +40,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
         {content}
       </div>
     );
@@ -50,4 +50,3 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 };
 
 export default LoadingSpinner;
-

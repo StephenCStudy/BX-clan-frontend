@@ -5,7 +5,10 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           {/* About Section */}
           <div>
-            <h3 className="text-xl font-bold text-white! mb-4">BX Clan</h3>
+            <h3 className="text-xl font-bold text-white! mb-4 flex items-center gap-2">
+              <span>🎮</span>
+              <span>BX Clan</span>
+            </h3>
             <p className="text-sm text-gray-400 mb-4">
               Clan Wild Rift hàng đầu Việt Nam. Chuyên nghiệp, đoàn kết, và luôn
               hướng đến chiến thắng.
@@ -17,14 +20,15 @@ export default function Footer() {
 
           {/* Contact Section */}
           <div>
-            <h3 className="text-lg font-bold text-white! mb-4">
+            <h3 className="text-lg font-bold text-white! mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-address-book inline-block"></i>
               Liên hệ & Hỗ trợ
             </h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <a
                   href="mailto:support@bxclan.com"
-                  className="flex items-center gap-2 hover:text-red-400 transition"
+                  className="flex items-center gap-2 hover:text-red-400 transition-fast"
                 >
                   <span>
                     <i className="fa-solid fa-envelope"></i>
@@ -37,7 +41,7 @@ export default function Footer() {
                   href="https://facebook.com/bxclan"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 hover:text-red-400 transition"
+                  className="flex items-center gap-2 hover:text-red-400 transition-fast"
                 >
                   <span>
                     <i className="fa-brands fa-facebook"></i>
@@ -50,7 +54,7 @@ export default function Footer() {
                   href="https://discord.gg/AkuphZ4K"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 hover:text-red-400 transition"
+                  className="flex items-center gap-2 hover:text-red-400 transition-fast"
                 >
                   <span>
                     <i className="fa-brands fa-discord"></i>
@@ -63,7 +67,7 @@ export default function Footer() {
                   href="https://tiktok.com/@bxclan"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 hover:text-red-400 transition"
+                  className="flex items-center gap-2 hover:text-red-400 transition-fast"
                 >
                   <span>
                     <i className="fa-brands fa-tiktok"></i>
@@ -74,39 +78,77 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Developer Section */}
+          {/* Developer & Deploy Section - Same Row */}
           <div>
-            <h3 className="text-lg font-bold text-white! mb-4">
-              Thông tin nhà phát triển
-            </h3>
-            <div className="space-y-2 text-sm">
-              <p className="flex items-center gap-2">
-                <span>
-                  <i className="fa-solid fa-user"></i>
-                </span>
-                <span>
-                  Developed by{" "}
-                  <span className="text-white! font-bold">StephenDuc</span>
-                </span>
-              </p>
-              <p className="text-xs text-gray-500">Full-stack Developer</p>
-              <div className="flex gap-3 mt-4">
-                <a
-                  href="https://github.com/StephenCStudy/BX-clan"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 transition text-xs font-semibold"
-                >
-                  <i className="fa-brands fa-github"></i> GitHub
-                </a>
-                <a
-                  href="https://www.facebook.com/stephen.uc.2025/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 transition text-xs font-semibold"
-                >
-                  <i className="fa-brands fa-facebook"></i> FaceBook
-                </a>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Developer Info */}
+              <div>
+                <h3 className="text-sm font-bold text-white! mb-2 flex items-center gap-2">
+                  <i className="fa-solid fa-code inline-block text-xs"></i>
+                  Nhà phát triển
+                </h3>
+                <div className="space-y-1 text-xs">
+                  <p className="flex items-center gap-1">
+                    <i className="fa-solid fa-user text-[10px]"></i>
+                    <span className="text-white! font-bold">StephenDuc</span>
+                  </p>
+                  <p className="text-[10px] text-gray-500">
+                    Full-stack Developer
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <a
+                      href="https://github.com/StephenCStudy/BX-clan"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 transition-fast text-[10px] font-semibold"
+                    >
+                      <i className="fa-brands fa-github"></i> GitHub
+                    </a>
+                    <a
+                      href="https://www.facebook.com/stephen.uc.2025/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 transition-fast text-[10px] font-semibold"
+                    >
+                      <i className="fa-brands fa-facebook"></i> FB
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deploy Info */}
+              <div>
+                <h3 className="text-sm font-bold text-white! mb-2 flex items-center gap-2">
+                  <i className="fa-solid fa-server inline-block text-xs"></i>
+                  Deploy
+                </h3>
+                <div className="space-y-1 text-xs">
+                  <p className="flex items-center gap-1">
+                    <i className="fa-solid fa-user text-[10px]"></i>
+                    <span className="text-white! font-bold">Trọng Mẫn</span>
+                  </p>
+                  <p className="text-[10px] text-gray-500">
+                    CEO - DevOps Engineer
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <a
+                      href="https://github.com/StephenCStudy/BX-clan"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 transition-fast text-[10px] font-semibold"
+                    >
+                      <i className="fa-brands fa-github"></i> GitHub
+                    </a>
+                    <a
+                      href="https://www.facebook.com/stephen.uc.2025/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-700 transition-fast text-[10px] font-semibold"
+                    >
+                      <i className="fa-brands fa-facebook"></i> FB
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -116,13 +158,14 @@ export default function Footer() {
         <div className="border-t border-gray-800 pt-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-500">
             <p>
-              Made with ❤️ for the Wild Rift community - website version 1.1
+              Made with <span className="text-red-500">❤️</span> for the Wild
+              Rift community - website version 1.2.0
             </p>
             <div className="flex gap-4">
-              <a href="#" className="hover:text-red-400 transition">
+              <a href="#" className="hover:text-red-400 transition-fast">
                 Privacy Policy
               </a>
-              <a href="#" className="hover:text-red-400 transition">
+              <a href="#" className="hover:text-red-400 transition-fast">
                 Terms of Service
               </a>
             </div>

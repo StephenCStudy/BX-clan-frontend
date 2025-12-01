@@ -177,7 +177,7 @@ export default function CustomsPage() {
   const isMember = user && user.role === "member";
 
   return (
-    <div className="max-w-6xl mx-auto p-3 md:p-6">
+    <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
       <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
         <h1 className="text-xl md:text-3xl lg:text-4xl font-bold text-red-600">
           Custom Games
@@ -201,7 +201,7 @@ export default function CustomsPage() {
       </div>
 
       {/* Search and Filter Bar */}
-      <div className="mb-4 flex flex-col md:flex-row gap-3">
+      <div className="mb-4 flex flex-col md:flex-row gap-3 animate-fade-in-up">
         <input
           type="text"
           placeholder="🔍 Tìm kiếm theo tên phòng..."
@@ -210,7 +210,7 @@ export default function CustomsPage() {
             setSearchQuery(e.target.value);
             setCurrentPage(1);
           }}
-          className="flex-1 p-3 text-sm bg-white rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+          className="flex-1 p-3 text-sm bg-white rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
         />
         <select
           value={statusFilter}
@@ -218,7 +218,7 @@ export default function CustomsPage() {
             setStatusFilter(e.target.value);
             setCurrentPage(1);
           }}
-          className="md:w-48 p-3 text-sm bg-white rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+          className="md:w-48 p-3 text-sm bg-white rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
         >
           <option value="all">📋 Tất cả trạng thái</option>
           <option value="open">🟢 Đang mở</option>
@@ -231,9 +231,10 @@ export default function CustomsPage() {
       {showForm && (
         <form
           onSubmit={createCustom}
-          className="bg-white rounded-xl border-2 border-gray-200 p-3 md:p-6 mb-4 md:mb-6 shadow-lg"
+          className="bg-white rounded-xl border-2 border-gray-200 p-3 md:p-6 mb-4 md:mb-6 shadow-lg animate-scale-in gpu-accelerated"
         >
-          <h2 className="text-lg md:text-2xl font-semibold text-red-600 mb-3 md:mb-4">
+          <h2 className="text-lg md:text-2xl font-semibold text-red-600 mb-3 md:mb-4 flex items-center gap-2">
+            <span className="animate-pulse">🎮</span>
             Tạo Custom mới
           </h2>
           <div className="space-y-3">
@@ -242,7 +243,7 @@ export default function CustomsPage() {
                 Tiêu đề
               </label>
               <input
-                className="w-full p-2 md:p-3 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                className="w-full p-2 md:p-3 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 required
@@ -253,7 +254,7 @@ export default function CustomsPage() {
                 Mô tả
               </label>
               <textarea
-                className="w-full p-2 md:p-3 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                className="w-full p-2 md:p-3 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
                 value={form.description}
                 onChange={(e) =>
                   setForm({ ...form, description: e.target.value })
@@ -268,7 +269,7 @@ export default function CustomsPage() {
                 </label>
                 <input
                   type="datetime-local"
-                  className="w-full p-2 text-xs md:text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                  className="w-full p-2 text-xs md:text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
                   value={form.scheduleTime}
                   onChange={(e) =>
                     setForm({ ...form, scheduleTime: e.target.value })
@@ -296,7 +297,7 @@ export default function CustomsPage() {
                   type="number"
                   min={1}
                   max={10}
-                  className="w-full p-2 md:p-3 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200"
+                  className="w-full p-2 md:p-3 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
                   value={form.bestOf}
                   onChange={(e) =>
                     setForm({ ...form, bestOf: Number(e.target.value) })
@@ -331,7 +332,8 @@ export default function CustomsPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs md:text-sm text-gray-700 font-medium">
-                  Chọn người chơi ({selectedMembers.length}/10) - có thể thêm sau
+                  Chọn người chơi ({selectedMembers.length}/10) - có thể thêm
+                  sau
                 </label>
                 <button
                   type="button"
@@ -344,7 +346,7 @@ export default function CustomsPage() {
 
               {/* Selected Members Display */}
               {selectedMembers.length > 0 && (
-                <div className="mb-3 p-3 bg-gray-50 rounded-lg border-2 border-gray-300">
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg border-2 border-gray-300 animate-fade-in gpu-accelerated">
                   <div className="grid grid-cols-2 gap-3">
                     {/* Team 1 */}
                     <div>
@@ -355,13 +357,13 @@ export default function CustomsPage() {
                         {selectedMembers.slice(0, 5).map((m) => (
                           <div
                             key={m._id}
-                            className="flex items-center gap-2 p-2 bg-white rounded border"
+                            className="flex items-center gap-2 p-2 bg-white rounded border hover-lift transition-smooth gpu-accelerated"
                           >
                             {m.avatarUrl && (
                               <img
                                 src={m.avatarUrl}
                                 alt=""
-                                className="w-6 h-6 rounded-full"
+                                className="w-6 h-6 rounded-full hover-grow transition-smooth gpu-accelerated"
                               />
                             )}
                             <span className="text-xs font-medium flex-1">
@@ -370,7 +372,7 @@ export default function CustomsPage() {
                             <button
                               type="button"
                               onClick={() => toggleMember(m)}
-                              className="text-red-500 hover:text-red-700 text-xs"
+                              className="text-red-500 hover:text-red-700 text-xs transition-smooth hover-shrink"
                             >
                               ✕
                             </button>
@@ -388,13 +390,13 @@ export default function CustomsPage() {
                         {selectedMembers.slice(5, 10).map((m) => (
                           <div
                             key={m._id}
-                            className="flex items-center gap-2 p-2 bg-white rounded border"
+                            className="flex items-center gap-2 p-2 bg-white rounded border hover-lift transition-smooth gpu-accelerated"
                           >
                             {m.avatarUrl && (
                               <img
                                 src={m.avatarUrl}
                                 alt=""
-                                className="w-6 h-6 rounded-full"
+                                className="w-6 h-6 rounded-full hover-grow transition-smooth gpu-accelerated"
                               />
                             )}
                             <span className="text-xs font-medium flex-1">
@@ -403,7 +405,7 @@ export default function CustomsPage() {
                             <button
                               type="button"
                               onClick={() => toggleMember(m)}
-                              className="text-red-500 hover:text-red-700 text-xs"
+                              className="text-red-500 hover:text-red-700 text-xs transition-smooth hover-shrink"
                             >
                               ✕
                             </button>
@@ -417,7 +419,7 @@ export default function CustomsPage() {
 
               {/* Member Selection Dropdown */}
               {showMemberSelect && (
-                <div className="max-h-60 overflow-y-auto bg-white border-2 border-gray-300 rounded-lg p-2">
+                <div className="max-h-60 overflow-y-auto bg-white border-2 border-gray-300 rounded-lg p-2 animate-scale-in gpu-accelerated">
                   <div className="space-y-1">
                     {members.map((member) => {
                       const isSelected = selectedMembers.find(
@@ -429,7 +431,7 @@ export default function CustomsPage() {
                           type="button"
                           onClick={() => toggleMember(member)}
                           disabled={!isSelected && selectedMembers.length >= 10}
-                          className={`w-full flex items-center gap-2 p-2 rounded text-left transition ${
+                          className={`w-full flex items-center gap-2 p-2 rounded text-left transition-smooth hover-lift gpu-accelerated ${
                             isSelected
                               ? "bg-green-100 border-2 border-green-500"
                               : "bg-gray-50 hover:bg-gray-100 border border-gray-300"
@@ -443,7 +445,7 @@ export default function CustomsPage() {
                             <img
                               src={member.avatarUrl}
                               alt=""
-                              className="w-8 h-8 rounded-full"
+                              className="w-8 h-8 rounded-full hover-grow transition-smooth gpu-accelerated"
                             />
                           )}
                           <div className="flex-1">

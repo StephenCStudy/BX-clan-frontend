@@ -9,7 +9,14 @@ import { http } from "../../utils/http";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
 
-type Tab = "overview" | "members" | "customs" | "news" | "reports" | "rooms";
+type Tab =
+  | "overview"
+  | "members"
+  | "customs"
+  | "news"
+  | "reports"
+  | "rooms"
+  | "matches";
 
 export default function AdminPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,14 +60,22 @@ export default function AdminPage() {
     useState<string | null>(null);
   const [allMembersForAdd, setAllMembersForAdd] = useState<any[]>([]);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
-  const [selectedMemberToAdd, setSelectedMemberToAdd] = useState<string | null>(
-    null
+  const [selectedMembersToAdd, setSelectedMembersToAdd] = useState<string[]>(
+    []
   );
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [showRoomParticipantsModal, setShowRoomParticipantsModal] =
+    useState(false);
+  const [selectedRoomForParticipants, setSelectedRoomForParticipants] =
+    useState<any>(null);
 
-  // Check permission - only leader can access AdminPage
+  // Check permission - only leader or organizer can access AdminPage
   useEffect(() => {
-    if (!user || user.role !== "leader") {
-      toast.error("Chỉ Trưởng Clan mới có quyền truy cập trang này");
+    if (!user || (user.role !== "leader" && user.role !== "organizer")) {
+      toast.error(
+        "Chỉ Trưởng Clan hoặc Ban Tổ Chức mới có quyền truy cập trang này"
+      );
       navigate("/");
     }
   }, [user, navigate]);
@@ -70,6 +85,7 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
+    setIsLoading(true);
     Promise.all([
       http.get("/members"),
       http.get("/customs", { params: { limit: 1000 } }),
@@ -136,9 +152,12 @@ export default function AdminPage() {
           })
         ).then((roomsData) => {
           setRoomsByNews(roomsData);
+          setIsLoading(false);
         });
       })
-      .catch(() => {});
+      .catch(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   const kickMember = async (id: string) => {
@@ -313,18 +332,24 @@ export default function AdminPage() {
   };
 
   const addMemberToRegistration = async () => {
-    if (!selectedMemberToAdd || !selectedNewsForRegistrations) return;
+    if (!selectedMembersToAdd.length || !selectedNewsForRegistrations) return;
     try {
-      await http.post("/registrations", {
-        news: selectedNewsForRegistrations,
-        user: selectedMemberToAdd,
-        ingameName: "Manual Add",
-        lane: "Giữa",
-        rank: "Vàng",
-      });
-      toast.success("Đã thêm thành viên");
+      // Add members in parallel
+      await Promise.all(
+        selectedMembersToAdd.map((userId) =>
+          http.post("/registrations", {
+            news: selectedNewsForRegistrations,
+            user: userId,
+            ingameName: "Manual Add",
+            lane: "Giữa",
+            rank: "Vàng",
+          })
+        )
+      );
+      toast.success(`Đã thêm ${selectedMembersToAdd.length} thành viên`);
       setShowAddMemberModal(false);
-      setSelectedMemberToAdd(null);
+      setSelectedMembersToAdd([]);
+      setMemberSearchQuery("");
       loadRegistrationList(selectedNewsForRegistrations);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Lỗi thêm thành viên");
@@ -332,13 +357,25 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-3 md:p-6">
+    <div className="w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+      {isLoading && (
+        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mb-4"></div>
+            <p className="text-gray-700 font-semibold">Đang tải dữ liệu...</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Vui lòng đợi trong giây lát
+            </p>
+          </div>
+        </div>
+      )}
+
       <h1 className="text-xl md:text-3xl lg:text-4xl font-extrabold mb-3 md:mb-6 bg-linear-to-r from-fuchsia-500 via-rose-500 to-amber-400 bg-clip-text text-transparent">
         Admin Dashboard
       </h1>
 
       {/* Stat Cards - Clickable */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4 mb-3 md:mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4 mb-3 md:mb-8">
         <button
           onClick={() => navigate("/admin/members")}
           className="rounded-lg p-2.5 md:p-5 text-center text-white shadow-lg bg-linear-to-br from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 transition-all transform hover:scale-105 cursor-pointer"
@@ -392,6 +429,17 @@ export default function AdminPage() {
           </p>
           <p className="mt-1 md:mt-2 opacity-90 font-medium text-xs md:text-base">
             Đăng ký phòng
+          </p>
+        </button>
+        <button
+          onClick={() => navigate("/admin/matches")}
+          className="rounded-lg p-2.5 md:p-5 text-center text-white shadow-lg bg-linear-to-br from-indigo-400 to-indigo-600 hover:from-indigo-500 hover:to-indigo-700 transition-all transform hover:scale-105 cursor-pointer"
+        >
+          <p className="text-xl md:text-4xl font-extrabold drop-shadow-sm">
+            {stats.rooms ?? 0}
+          </p>
+          <p className="mt-1 md:mt-2 opacity-90 font-medium text-xs md:text-base">
+            Danh Sách Đấu
           </p>
         </button>
       </div>
@@ -548,74 +596,92 @@ export default function AdminPage() {
           </div>
 
           {/* Charts Section */}
-          <div className="bg-white rounded-xl border-2 border-gray-200 p-4 sm:p-5 md:p-6 shadow-md">
-            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-indigo-600">
+          <div className="bg-white rounded-xl border-2 border-gray-200 p-4 sm:p-5 md:p-6 shadow-lg">
+            <h2 className="text-xl sm:text-2xl font-bold mb-6 text-indigo-600 flex items-center gap-3">
+              <span className="w-2 h-8 bg-indigo-500 rounded-full"></span>
               Biểu đồ tổng quan
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
               {/* Members by Role Chart */}
-              <div className="bg-linear-to-br from-emerald-50 to-teal-50 rounded-xl p-5 border-2 border-emerald-200">
-                <h3 className="text-lg font-bold mb-4 text-emerald-700 flex items-center gap-2">
-                  👥 Thành viên theo Role
+              <div className="bg-linear-to-br from-emerald-50 via-white to-teal-50 rounded-2xl p-6 border-2 border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="text-lg font-bold mb-5 text-emerald-700 flex items-center gap-2 border-b-2 border-emerald-100 pb-3">
+                  <span className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                    👥
+                  </span>
+                  Thành viên theo Role
                 </h3>
-                <div className="h-64 flex items-end justify-around gap-4 px-2">
+                <div className="h-64 flex items-end justify-around gap-3 px-2 pt-4 border-b-2 border-dashed border-gray-200">
                   {[
                     {
                       role: "Leader",
                       count: members.filter((m: any) => m.role === "leader")
                         .length,
-                      color: "bg-gradient-to-t from-red-500 to-red-400",
-                      shadowColor: "shadow-red-300",
+                      color: "bg-linear-to-t from-red-600 to-red-400",
+                      bgColor: "bg-red-50",
+                      borderColor: "border-red-200",
                     },
                     {
                       role: "Organizer",
                       count: members.filter((m: any) => m.role === "organizer")
                         .length,
-                      color: "bg-gradient-to-t from-blue-500 to-blue-400",
-                      shadowColor: "shadow-blue-300",
+                      color: "bg-linear-to-t from-blue-600 to-blue-400",
+                      bgColor: "bg-blue-50",
+                      borderColor: "border-blue-200",
                     },
                     {
                       role: "Moderator",
                       count: members.filter((m: any) => m.role === "moderator")
                         .length,
-                      color: "bg-gradient-to-t from-purple-500 to-purple-400",
-                      shadowColor: "shadow-purple-300",
+                      color: "bg-linear-to-t from-purple-600 to-purple-400",
+                      bgColor: "bg-purple-50",
+                      borderColor: "border-purple-200",
                     },
                     {
                       role: "Member",
                       count: members.filter((m: any) => m.role === "member")
                         .length,
-                      color: "bg-gradient-to-t from-gray-500 to-gray-400",
-                      shadowColor: "shadow-gray-300",
+                      color: "bg-linear-to-t from-gray-600 to-gray-400",
+                      bgColor: "bg-gray-50",
+                      borderColor: "border-gray-200",
                     },
-                  ].map((item) => {
+                  ].map((item, index) => {
+                    const maxCount = Math.max(
+                      members.filter((m: any) => m.role === "leader").length,
+                      members.filter((m: any) => m.role === "organizer").length,
+                      members.filter((m: any) => m.role === "moderator").length,
+                      members.filter((m: any) => m.role === "member").length,
+                      1
+                    );
                     const heightPercent = Math.max(
-                      (item.count / Math.max(members.length, 1)) * 100,
+                      (item.count / maxCount) * 100,
                       8
                     );
                     return (
                       <div
                         key={item.role}
-                        className="flex-1 flex flex-col items-center group"
+                        className={`flex-1 flex flex-col items-center group ${
+                          index < 3
+                            ? "border-r-2 border-dashed border-gray-200 pr-3"
+                            : ""
+                        }`}
                       >
                         <div className="relative w-full flex flex-col items-center">
-                          {/* Value label on top */}
-                          <div className="mb-2 px-3 py-1 bg-white rounded-full shadow-md border-2 border-gray-200 group-hover:scale-110 transition-transform">
-                            <span className="text-lg font-extrabold text-gray-800">
+                          <div
+                            className={`mb-3 px-3 py-1.5 ${item.bgColor} rounded-lg shadow-sm border ${item.borderColor} group-hover:scale-110 transition-all duration-200`}
+                          >
+                            <span className="text-lg font-black text-gray-800">
                               {item.count}
                             </span>
                           </div>
-                          {/* Bar */}
                           <div
-                            className={`w-full ${item.color} rounded-t-xl ${item.shadowColor} shadow-lg hover:shadow-xl transition-all duration-300 group-hover:scale-105`}
+                            className={`w-4/5 ${item.color} rounded-t-lg shadow-md hover:shadow-lg transition-all duration-300 group-hover:w-full`}
                             style={{
                               height: `${heightPercent}%`,
-                              minHeight: "20px",
+                              minHeight: "16px",
                             }}
                           />
                         </div>
-                        {/* Label */}
-                        <p className="text-xs md:text-sm font-bold mt-3 text-gray-700 text-center">
+                        <p className="text-xs md:text-sm font-bold mt-3 text-gray-600 text-center">
                           {item.role}
                         </p>
                       </div>
@@ -624,73 +690,119 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Reports Status Chart */}
-              <div className="bg-linear-to-br from-orange-50 to-amber-50 rounded-xl p-5 border-2 border-orange-200">
-                <h3 className="text-lg font-bold mb-4 text-orange-700 flex items-center gap-2">
-                  📋 Trạng thái báo cáo
+              {/* Rooms by Time Period Chart */}
+              <div className="bg-linear-to-br from-violet-50 via-white to-indigo-50 rounded-2xl p-6 border-2 border-violet-200 shadow-sm hover:shadow-md transition-shadow">
+                <h3 className="text-lg font-bold mb-5 text-violet-700 flex items-center gap-2 border-b-2 border-violet-100 pb-3">
+                  <span className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
+                    🏠
+                  </span>
+                  Phòng theo thời gian
                 </h3>
-                <div className="h-64 flex items-end justify-around gap-8 px-4">
-                  {[
-                    {
-                      status: "Pending",
-                      count: reports.filter((r: any) => r.status === "pending")
-                        .length,
-                      color: "bg-gradient-to-t from-yellow-500 to-yellow-400",
-                      shadowColor: "shadow-yellow-300",
-                      icon: "⏳",
-                    },
-                    {
-                      status: "Reviewed",
-                      count: reports.filter((r: any) => r.status === "reviewed")
-                        .length,
-                      color: "bg-gradient-to-t from-green-500 to-green-400",
-                      shadowColor: "shadow-green-300",
-                      icon: "✅",
-                    },
-                  ].map((item) => {
+                <div className="h-64 flex items-end justify-around gap-3 px-2 pt-4 border-b-2 border-dashed border-gray-200">
+                  {(() => {
+                    const now = new Date();
+                    const today = now.toDateString();
+                    const thisMonth = now.getMonth();
+                    const thisYear = now.getFullYear();
+
+                    const roomsToday = customs.filter((c: any) => {
+                      const d = new Date(c.createdAt || c.scheduleTime);
+                      return d.toDateString() === today;
+                    }).length;
+
+                    const roomsThisMonth = customs.filter((c: any) => {
+                      const d = new Date(c.createdAt || c.scheduleTime);
+                      return (
+                        d.getMonth() === thisMonth &&
+                        d.getFullYear() === thisYear
+                      );
+                    }).length;
+
+                    const roomsThisYear = customs.filter((c: any) => {
+                      const d = new Date(c.createdAt || c.scheduleTime);
+                      return d.getFullYear() === thisYear;
+                    }).length;
+
+                    const totalRooms = customs.length;
+
+                    const chartData = [
+                      {
+                        label: "Hôm nay",
+                        count: roomsToday,
+                        color: "bg-linear-to-t from-cyan-600 to-cyan-400",
+                        bgColor: "bg-cyan-50",
+                        borderColor: "border-cyan-200",
+                        icon: "📅",
+                      },
+                      {
+                        label: "Tháng này",
+                        count: roomsThisMonth,
+                        color: "bg-linear-to-t from-violet-600 to-violet-400",
+                        bgColor: "bg-violet-50",
+                        borderColor: "border-violet-200",
+                        icon: "📆",
+                      },
+                      {
+                        label: "Năm nay",
+                        count: roomsThisYear,
+                        color: "bg-linear-to-t from-fuchsia-600 to-fuchsia-400",
+                        bgColor: "bg-fuchsia-50",
+                        borderColor: "border-fuchsia-200",
+                        icon: "🗓️",
+                      },
+                      {
+                        label: "Tổng cộng",
+                        count: totalRooms,
+                        color: "bg-linear-to-t from-indigo-600 to-indigo-400",
+                        bgColor: "bg-indigo-50",
+                        borderColor: "border-indigo-200",
+                        icon: "📊",
+                      },
+                    ];
+
                     const maxCount = Math.max(
-                      reports.filter((r: any) => r.status === "pending").length,
-                      reports.filter((r: any) => r.status === "reviewed")
-                        .length,
+                      ...chartData.map((d) => d.count),
                       1
                     );
-                    const heightPercent = Math.max(
-                      (item.count / maxCount) * 100,
-                      10
-                    );
-                    return (
-                      <div
-                        key={item.status}
-                        className="flex-1 max-w-[120px] flex flex-col items-center group"
-                      >
-                        <div className="relative w-full flex flex-col items-center">
-                          {/* Value label on top */}
-                          <div className="mb-2 px-4 py-1.5 bg-white rounded-full shadow-md border-2 border-gray-200 group-hover:scale-110 transition-transform">
-                            <span className="text-xl font-extrabold text-gray-800">
-                              {item.count}
-                            </span>
-                          </div>
-                          {/* Bar */}
-                          <div
-                            className={`w-full ${item.color} rounded-t-xl ${item.shadowColor} shadow-lg hover:shadow-xl transition-all duration-300 group-hover:scale-105 relative`}
-                            style={{
-                              height: `${heightPercent}%`,
-                              minHeight: "30px",
-                            }}
-                          >
-                            {/* Icon inside bar */}
-                            <div className="absolute inset-0 flex items-center justify-center text-2xl opacity-80">
-                              {item.icon}
+
+                    return chartData.map((item, index) => {
+                      const heightPercent = Math.max(
+                        (item.count / maxCount) * 100,
+                        8
+                      );
+                      return (
+                        <div
+                          key={item.label}
+                          className={`flex-1 flex flex-col items-center group ${
+                            index < 3
+                              ? "border-r-2 border-dashed border-gray-200 pr-3"
+                              : ""
+                          }`}
+                        >
+                          <div className="relative w-full flex flex-col items-center">
+                            <div
+                              className={`mb-3 px-3 py-1.5 ${item.bgColor} rounded-lg shadow-sm border ${item.borderColor} group-hover:scale-110 transition-all duration-200 flex items-center gap-1`}
+                            >
+                              <span className="text-sm">{item.icon}</span>
+                              <span className="text-lg font-black text-gray-800">
+                                {item.count}
+                              </span>
                             </div>
+                            <div
+                              className={`w-4/5 ${item.color} rounded-t-lg shadow-md hover:shadow-lg transition-all duration-300 group-hover:w-full`}
+                              style={{
+                                height: `${heightPercent}%`,
+                                minHeight: "16px",
+                              }}
+                            />
                           </div>
+                          <p className="text-xs md:text-sm font-bold mt-3 text-gray-600 text-center">
+                            {item.label}
+                          </p>
                         </div>
-                        {/* Label */}
-                        <p className="text-sm md:text-base font-bold mt-3 text-gray-700 text-center">
-                          {item.status}
-                        </p>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
@@ -808,12 +920,25 @@ export default function AdminPage() {
                           </td>
                           <td className="px-2 md:px-3 py-2 md:py-3 hidden lg:table-cell">
                             <div className="text-xs">
-                              <span className="font-mono bg-gray-100 px-2 py-1 rounded border border-gray-300 inline-block">
-                                ••••••••
-                              </span>
-                              <span className="block text-[10px] text-gray-500 mt-1">
-                                Ẩn vì bảo mật
-                              </span>
+                              {user?.role === "leader" && m.password ? (
+                                <>
+                                  <span className="font-mono bg-gray-100 px-2 py-1 rounded border border-gray-300 inline-block">
+                                    {m.password}
+                                  </span>
+                                  <span className="block text-[10px] text-gray-500 mt-1">
+                                    Chỉ leader mới thấy
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-mono bg-gray-100 px-2 py-1 rounded border border-gray-300 inline-block">
+                                    ••••••••
+                                  </span>
+                                  <span className="block text-[10px] text-gray-500 mt-1">
+                                    Ẩn vì bảo mật
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </td>
                           <td className="px-2 md:px-3 py-2 md:py-3">
@@ -1463,6 +1588,267 @@ export default function AdminPage() {
               )}
             </div>
           ))}
+
+          {/* Section 2: Manual Rooms (customs not linked to news) */}
+          <div className="mt-6 border-2 border-purple-200 rounded-xl p-3 sm:p-4 bg-purple-50">
+            <h3 className="text-base sm:text-lg font-bold text-purple-700 mb-3 flex items-center gap-2">
+              🎮 Phòng tạo bằng tay (Custom Games)
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Các phòng được tạo thủ công từ trang Custom Games, không liên kết
+              với bài đăng.
+            </p>
+            {(() => {
+              const newsRoomIds = roomsByNews.flatMap((nr: any) =>
+                nr.rooms.map((r: any) => r._id)
+              );
+              const manualRooms = customs.filter(
+                (c: any) => !newsRoomIds.includes(c._id)
+              );
+
+              if (manualRooms.length === 0) {
+                return (
+                  <p className="text-gray-500 text-sm">
+                    Chưa có phòng nào được tạo bằng tay.
+                  </p>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {manualRooms.map((room: any) => (
+                    <div
+                      key={room._id}
+                      className="bg-white rounded-lg border-2 border-gray-200 p-3"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                        <div>
+                          <h4 className="font-semibold text-gray-900">
+                            {room.title}
+                          </h4>
+                          <p className="text-xs text-gray-600">
+                            🕒{" "}
+                            {new Date(room.scheduleTime).toLocaleString(
+                              "vi-VN"
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/customs/${room._id}`}
+                            className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium"
+                          >
+                            👁️ Xem
+                          </Link>
+                          <button
+                            onClick={() => requestDeleteCustom(room._id)}
+                            className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium"
+                          >
+                            🗑️ Xóa
+                          </button>
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-bold ${
+                              room.status === "open"
+                                ? "bg-green-100 text-green-700"
+                                : room.status === "ongoing"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {room.status === "open"
+                              ? "Mở"
+                              : room.status === "ongoing"
+                              ? "Đang chơi"
+                              : "Đóng"}
+                          </span>
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-bold ${
+                              room.players?.length >= 10
+                                ? "bg-red-100 text-red-600"
+                                : "bg-green-100 text-green-600"
+                            }`}
+                          >
+                            {room.players?.length || 0}/10
+                          </span>
+                        </div>
+                      </div>
+                      {/* Teams display */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                        {room.team1 && room.team1.length > 0 && (
+                          <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                            <div className="font-semibold text-blue-700 text-xs mb-1">
+                              Đội 1 ({room.team1.length}/5)
+                            </div>
+                            <div className="space-y-0.5">
+                              {room.team1.map((player: any) => (
+                                <div
+                                  key={player._id}
+                                  className="flex items-center gap-2"
+                                >
+                                  <img
+                                    src={
+                                      player.avatarUrl ||
+                                      "https://placehold.co/24x24"
+                                    }
+                                    alt=""
+                                    className="w-5 h-5 rounded-full shrink-0"
+                                  />
+                                  <span className="text-xs text-gray-700 truncate">
+                                    {player.ingameName || player.username}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {room.team2 && room.team2.length > 0 && (
+                          <div className="bg-red-50 border border-red-200 rounded p-2">
+                            <div className="font-semibold text-red-700 text-xs mb-1">
+                              Đội 2 ({room.team2.length}/5)
+                            </div>
+                            <div className="space-y-0.5">
+                              {room.team2.map((player: any) => (
+                                <div
+                                  key={player._id}
+                                  className="flex items-center gap-2"
+                                >
+                                  <img
+                                    src={
+                                      player.avatarUrl ||
+                                      "https://placehold.co/24x24"
+                                    }
+                                    alt=""
+                                    className="w-5 h-5 rounded-full shrink-0"
+                                  />
+                                  <span className="text-xs text-gray-700 truncate">
+                                    {player.ingameName || player.username}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "matches" && (
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-3 sm:p-4 md:p-6 shadow-md">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 md:mb-4 text-indigo-700">
+            📋 Danh Sách Đấu
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Tổng hợp tất cả các phòng đấu. Ấn "Coi" để xem danh sách thành viên.
+          </p>
+
+          {/* All rooms list */}
+          {(() => {
+            const newsRoomIds = roomsByNews.flatMap((nr: any) =>
+              nr.rooms.map((r: any) => r._id)
+            );
+            const manualRooms = customs.filter(
+              (c: any) => !newsRoomIds.includes(c._id)
+            );
+            const allNewsRooms = roomsByNews.flatMap((nr: any) =>
+              nr.rooms.map((r: any) => ({ ...r, newsTitle: nr.newsTitle }))
+            );
+            const allRooms = [...allNewsRooms, ...manualRooms];
+
+            if (allRooms.length === 0) {
+              return (
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  Chưa có phòng đấu nào.
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-3">
+                {allRooms.map((room: any) => (
+                  <div
+                    key={room._id}
+                    className="bg-gray-50 rounded-lg border-2 border-gray-200 p-3 hover:bg-gray-100 transition"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">
+                          {room.title}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {room.newsTitle && (
+                            <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
+                              📰 {room.newsTitle}
+                            </span>
+                          )}
+                          {!room.newsTitle && (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                              🎮 Tạo tay
+                            </span>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            🕒{" "}
+                            {new Date(room.scheduleTime).toLocaleString(
+                              "vi-VN"
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedRoomForParticipants(room);
+                            setShowRoomParticipantsModal(true);
+                          }}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold"
+                        >
+                          👁️ Coi
+                        </button>
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-bold ${
+                            room.status === "open"
+                              ? "bg-green-100 text-green-700"
+                              : room.status === "ongoing"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {room.status === "open"
+                            ? "Mở"
+                            : room.status === "ongoing"
+                            ? "Đang chơi"
+                            : "Đóng"}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-bold ${
+                            room.players?.length >= 10
+                              ? "bg-red-100 text-red-600"
+                              : "bg-green-100 text-green-600"
+                          }`}
+                        >
+                          {room.players?.length || 0}/10
+                        </span>
+                      </div>
+                    </div>
+                    {/* Teams summary */}
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div className="text-xs text-blue-700">
+                        🔵 Đội 1: {room.team1?.length || 0}/5
+                      </div>
+                      <div className="text-xs text-red-700">
+                        🔴 Đội 2: {room.team2?.length || 0}/5
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1758,22 +2144,58 @@ export default function AdminPage() {
               ➕ Thêm thành viên vào danh sách
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              Chọn thành viên để thêm vào danh sách đăng ký
+              Chọn nhiều thành viên để thêm vào danh sách đăng ký (có thể chọn
+              nhiều)
             </p>
+
+            {/* Search Input */}
+            <input
+              type="text"
+              placeholder="Tìm kiếm theo tên..."
+              value={memberSearchQuery}
+              onChange={(e) => setMemberSearchQuery(e.target.value)}
+              className="w-full p-3 mb-4 text-sm rounded-lg border-2 border-gray-300 focus:border-green-500 focus:ring-2 focus:ring-green-200"
+            />
+
+            {/* Selected Count */}
+            {selectedMembersToAdd.length > 0 && (
+              <div className="mb-3 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                <span className="text-sm font-semibold text-green-700">
+                  Đã chọn {selectedMembersToAdd.length} thành viên
+                </span>
+              </div>
+            )}
+
             <div className="space-y-2 mb-6">
               {allMembersForAdd
                 .filter((m) => {
                   // Filter out members already registered
-                  return !registrationList.some(
+                  const isRegistered = registrationList.some(
                     (reg) => reg.user?._id === m._id
                   );
+                  // Filter by search query
+                  const matchesSearch = memberSearchQuery
+                    ? m.username
+                        .toLowerCase()
+                        .includes(memberSearchQuery.toLowerCase()) ||
+                      m.ingameName
+                        ?.toLowerCase()
+                        .includes(memberSearchQuery.toLowerCase())
+                    : true;
+                  return !isRegistered && matchesSearch;
                 })
                 .map((member) => (
                   <button
                     key={member._id}
-                    onClick={() => setSelectedMemberToAdd(member._id)}
+                    onClick={() => {
+                      setSelectedMembersToAdd((prev) =>
+                        prev.includes(member._id)
+                          ? prev.filter((id) => id !== member._id)
+                          : [...prev, member._id]
+                      );
+                    }}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition ${
-                      selectedMemberToAdd === member._id
+                      selectedMembersToAdd.includes(member._id)
                         ? "bg-green-50 border-green-500"
                         : "bg-gray-50 border-gray-200 hover:border-gray-300"
                     }`}
@@ -1791,7 +2213,7 @@ export default function AdminPage() {
                         {member.ingameName || "Chưa có tên game"}
                       </div>
                     </div>
-                    {selectedMemberToAdd === member._id && (
+                    {selectedMembersToAdd.includes(member._id) && (
                       <span className="text-green-600 font-bold">✓</span>
                     )}
                   </button>
@@ -1800,19 +2222,196 @@ export default function AdminPage() {
             <div className="flex gap-3">
               <button
                 onClick={addMemberToRegistration}
-                disabled={!selectedMemberToAdd}
+                disabled={selectedMembersToAdd.length === 0}
                 className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition"
               >
-                Thêm
+                Thêm ({selectedMembersToAdd.length})
               </button>
               <button
                 onClick={() => {
                   setShowAddMemberModal(false);
-                  setSelectedMemberToAdd(null);
+                  setSelectedMembersToAdd([]);
+                  setMemberSearchQuery("");
                 }}
                 className="flex-1 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg font-semibold transition"
               >
                 Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Room Participants Modal */}
+      {showRoomParticipantsModal && selectedRoomForParticipants && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-indigo-700">
+                📋 Danh sách thành viên
+              </h3>
+              <button
+                onClick={() => {
+                  setShowRoomParticipantsModal(false);
+                  setSelectedRoomForParticipants(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Room Info */}
+            <div className="bg-indigo-50 rounded-lg p-3 mb-4 border border-indigo-200">
+              <h4 className="font-bold text-indigo-800">
+                {selectedRoomForParticipants.title}
+              </h4>
+              <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
+                {selectedRoomForParticipants.newsTitle && (
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
+                    📰 {selectedRoomForParticipants.newsTitle}
+                  </span>
+                )}
+                {!selectedRoomForParticipants.newsTitle && (
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                    🎮 Tạo tay
+                  </span>
+                )}
+                <span className="text-xs text-gray-500">
+                  🕒{" "}
+                  {new Date(
+                    selectedRoomForParticipants.scheduleTime
+                  ).toLocaleString("vi-VN")}
+                </span>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded font-bold ${
+                    selectedRoomForParticipants.status === "open"
+                      ? "bg-green-100 text-green-700"
+                      : selectedRoomForParticipants.status === "ongoing"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {selectedRoomForParticipants.status === "open"
+                    ? "Mở"
+                    : selectedRoomForParticipants.status === "ongoing"
+                    ? "Đang chơi"
+                    : "Đóng"}
+                </span>
+              </div>
+            </div>
+
+            {/* Teams */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Team 1 */}
+              <div className="bg-blue-50 rounded-lg border-2 border-blue-200 p-4">
+                <h5 className="font-bold text-blue-700 mb-3 flex items-center gap-2 text-lg">
+                  🔵 Đội 1{" "}
+                  <span className="text-sm font-normal">
+                    ({selectedRoomForParticipants.team1?.length || 0}/5)
+                  </span>
+                </h5>
+                {selectedRoomForParticipants.team1 &&
+                selectedRoomForParticipants.team1.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedRoomForParticipants.team1.map(
+                      (player: any, index: number) => (
+                        <div
+                          key={player._id}
+                          className="flex items-center gap-3 bg-white rounded-lg p-3 border border-blue-100 shadow-sm"
+                        >
+                          <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0">
+                            {index + 1}
+                          </span>
+                          <img
+                            src={
+                              player.avatarUrl || "https://placehold.co/40x40"
+                            }
+                            alt=""
+                            className="w-10 h-10 rounded-full border-2 border-blue-300 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">
+                              {player.ingameName || player.username}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {player.lane || "N/A"} • {player.rank || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm text-center py-6">
+                    Chưa có người chơi
+                  </p>
+                )}
+              </div>
+
+              {/* Team 2 */}
+              <div className="bg-red-50 rounded-lg border-2 border-red-200 p-4">
+                <h5 className="font-bold text-red-700 mb-3 flex items-center gap-2 text-lg">
+                  🔴 Đội 2{" "}
+                  <span className="text-sm font-normal">
+                    ({selectedRoomForParticipants.team2?.length || 0}/5)
+                  </span>
+                </h5>
+                {selectedRoomForParticipants.team2 &&
+                selectedRoomForParticipants.team2.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedRoomForParticipants.team2.map(
+                      (player: any, index: number) => (
+                        <div
+                          key={player._id}
+                          className="flex items-center gap-3 bg-white rounded-lg p-3 border border-red-100 shadow-sm"
+                        >
+                          <span className="w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0">
+                            {index + 1}
+                          </span>
+                          <img
+                            src={
+                              player.avatarUrl || "https://placehold.co/40x40"
+                            }
+                            alt=""
+                            className="w-10 h-10 rounded-full border-2 border-red-300 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">
+                              {player.ingameName || player.username}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {player.lane || "N/A"} • {player.rank || "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm text-center py-6">
+                    Chưa có người chơi
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-6 flex gap-3">
+              <Link
+                to={`/customs/${selectedRoomForParticipants._id}`}
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-center transition"
+              >
+                👁️ Xem chi tiết phòng
+              </Link>
+              <button
+                onClick={() => {
+                  setShowRoomParticipantsModal(false);
+                  setSelectedRoomForParticipants(null);
+                }}
+                className="flex-1 py-3 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg font-semibold transition"
+              >
+                Đóng
               </button>
             </div>
           </div>

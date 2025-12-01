@@ -1,26 +1,70 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export default function Header() {
   const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Dropdown menu items
+  const dropdownItems = [
+    { path: "/customs", label: "Custom Game", icon: "fa-gamepad" },
+    { path: "/news", label: "Tin tức", icon: "fa-newspaper" },
+    ...(user &&
+    (user.role === "leader" ||
+      user.role === "organizer" ||
+      user.role === "moderator")
+      ? [{ path: "/messages", label: "Tin nhắn", icon: "fa-comment" }]
+      : []),
+  ];
+
+  // Check if current path is in dropdown
+  const isDropdownActive = dropdownItems.some((item) =>
+    location.pathname.startsWith(item.path)
+  );
+  const currentDropdownItem = dropdownItems.find((item) =>
+    location.pathname.startsWith(item.path)
+  );
 
   return (
-    <header className="bg-red-600 text-white shadow-lg">
-      {/* Expanded width container (from max-w-6xl to max-w-7xl) */}
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <header className="bg-linear-to-r from-red-600 via-red-500 to-red-600 text-white shadow-xl sticky top-0 z-50 border-b border-red-700">
+      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-3 flex items-center justify-between gap-4">
         <Link
           to="/"
-          className="font-bold text-2xl tracking-wide hover:text-red-100 transition"
+          className="font-bold text-xl lg:text-2xl tracking-wide hover:text-red-100 transition-fast flex items-center gap-2 shrink-0"
         >
-          🎮 BX Clan
+          <img
+            src="/LOGO.png"
+            alt="BX Clan Logo"
+            className="w-9 h-9 lg:w-10 lg:h-10 rounded-full object-cover border-2 border-white/30 shadow-md"
+          />
+          <span className="bg-linear-to-r from-white to-red-100 bg-clip-text text-transparent font-extrabold">
+            BX Clan
+          </span>
         </Link>
 
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="md:hidden p-2 rounded-lg hover:bg-red-700 transition"
+          className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-all duration-200 border border-white/20"
           aria-label="Toggle menu"
         >
           {isMenuOpen ? (
@@ -55,102 +99,113 @@ export default function Header() {
         </button>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-6 flex-nowrap">
+        <nav className="hidden lg:flex items-center gap-1 xl:gap-2 flex-nowrap">
           <NavLink
             to="/"
             className={({ isActive }) =>
-              `hover:opacity-90 transition px-2 py-1 rounded-md whitespace-nowrap ${
-                isActive ? "bg-red-700/80 shadow-inner" : ""
+              `hover:bg-white/10 transition-all duration-200 px-3 py-2 rounded-lg whitespace-nowrap text-sm font-medium ${
+                isActive ? "bg-white/20 shadow-inner" : ""
               }`
             }
             end
           >
-            <i className="fa-solid fa-house"></i> Trang chủ
+            <i className="fa-solid fa-house mr-1.5"></i>Trang chủ
           </NavLink>
           <NavLink
             to="/members"
             className={({ isActive }) =>
-              `hover:opacity-90 transition px-2 py-1 rounded-md whitespace-nowrap ${
-                isActive ? "bg-red-700/80 shadow-inner" : ""
+              `hover:bg-white/10 transition-all duration-200 px-3 py-2 rounded-lg whitespace-nowrap text-sm font-medium ${
+                isActive ? "bg-white/20 shadow-inner" : ""
               }`
             }
           >
-            <i className="fa-solid fa-users"></i> Thành viên
+            <i className="fa-solid fa-users mr-1.5"></i>Thành viên
           </NavLink>
-          <NavLink
-            to="/customs"
-            className={({ isActive }) =>
-              `hover:opacity-90 transition px-2 py-1 rounded-md whitespace-nowrap ${
-                isActive ? "bg-red-700/80 shadow-inner" : ""
-              }`
-            }
-          >
-            <i className="fa-solid fa-gamepad"></i> Custom Game
-          </NavLink>
-          <NavLink
-            to="/news"
-            className={({ isActive }) =>
-              `hover:opacity-90 transition px-2 py-1 rounded-md whitespace-nowrap ${
-                isActive ? "bg-red-700/80 shadow-inner" : ""
-              }`
-            }
-          >
-            <i className="fa-solid fa-gamepad"></i> Tin tức
-          </NavLink>
+
+          {/* Dropdown Menu for Custom, News, Messages */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className={`hover:bg-white/10 transition-all duration-200 px-3 py-2 rounded-lg whitespace-nowrap text-sm font-medium flex items-center gap-1.5 ${
+                isDropdownActive ? "bg-white/20 shadow-inner" : ""
+              }`}
+            >
+              <i
+                className={`fa-solid ${
+                  currentDropdownItem?.icon || "fa-ellipsis"
+                }`}
+              ></i>
+              <span>{currentDropdownItem?.label || "Khác"}</span>
+              <i
+                className={`fa-solid fa-chevron-down text-xs transition-transform duration-200 ${
+                  isDropdownOpen ? "rotate-180" : ""
+                }`}
+              ></i>
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-40 z-50">
+                {dropdownItems.map((item) => (
+                  <button
+                    key={item.path}
+                    onClick={() => {
+                      navigate(item.path);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-red-50 transition-colors flex items-center gap-2 ${
+                      location.pathname.startsWith(item.path)
+                        ? "bg-red-100 text-red-700 font-semibold"
+                        : "text-gray-700"
+                    }`}
+                  >
+                    <i className={`fa-solid ${item.icon} w-4 text-center`}></i>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {user ? (
             <>
               <NavLink
                 to="/profile"
                 className={({ isActive }) =>
-                  `hover:opacity-90 transition px-2 py-1 rounded-md whitespace-nowrap ${
-                    isActive ? "bg-red-700/80 shadow-inner" : ""
+                  `hover:bg-white/10 transition-all duration-200 px-3 py-2 rounded-lg whitespace-nowrap text-sm font-medium ${
+                    isActive ? "bg-white/20 shadow-inner" : ""
                   }`
                 }
               >
-                <i className="fa-solid fa-user"></i> Cá nhân
+                <i className="fa-solid fa-user mr-1.5"></i>Cá nhân
               </NavLink>
-              {(user.role === "leader" ||
-                user.role === "organizer" ||
-                user.role === "moderator") && (
-                <NavLink
-                  to="/messages"
-                  className={({ isActive }) =>
-                    `hover:opacity-90 transition px-2 py-1 rounded-md whitespace-nowrap ${
-                      isActive ? "bg-red-700/80 shadow-inner" : ""
-                    }`
-                  }
-                >
-                  <i className="fa-solid fa-comment"></i> Tin nhắn
-                </NavLink>
-              )}
               {(user.role === "leader" || user.role === "organizer") && (
                 <Link
                   to="/admin"
-                  className="px-4 py-2 bg-red-700 hover:bg-red-800 rounded-lg font-medium transition shadow-md"
+                  className="px-3 py-2 bg-white/20 hover:bg-white/30 rounded-lg font-medium transition-all duration-200 shadow-md text-sm whitespace-nowrap border border-white/20"
                 >
-                  Quản lý
+                  <i className="fa-solid fa-shield-halved mr-1.5"></i>Quản lý
                 </Link>
               )}
               <button
                 onClick={logout}
-                className="px-4 py-2 bg-white text-red-600 hover:bg-gray-100 rounded-lg font-medium transition shadow-md"
+                className="px-3 py-2 bg-white text-red-600 hover:bg-red-50 rounded-lg font-medium transition-all duration-200 shadow-md text-sm whitespace-nowrap"
               >
-                <i className="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                <i className="fa-solid fa-right-from-bracket mr-1.5"></i>Thoát
               </button>
             </>
           ) : (
             <>
               <Link
                 to="/login"
-                className="px-5 py-2 bg-white text-red-600 hover:bg-gray-100 rounded-lg font-medium transition shadow-md"
+                className="px-4 py-2 bg-white text-red-600 hover:bg-red-50 rounded-lg font-medium transition-all duration-200 shadow-md text-sm whitespace-nowrap"
               >
-                Đăng nhập
+                <i className="fa-solid fa-right-to-bracket mr-1.5"></i>Đăng nhập
               </Link>
               <Link
                 to="/register"
-                className="px-5 py-2 bg-black text-white hover:bg-gray-800 rounded-lg font-medium transition shadow-md"
+                className="px-4 py-2 bg-gray-900 text-white hover:bg-gray-800 rounded-lg font-medium transition-all duration-200 shadow-md text-sm whitespace-nowrap"
               >
-                Đăng ký
+                <i className="fa-solid fa-user-plus mr-1.5"></i>Đăng ký
               </Link>
             </>
           )}
@@ -159,91 +214,94 @@ export default function Header() {
 
       {/* Mobile Nav */}
       {isMenuOpen && (
-        <nav className="md:hidden bg-red-700 px-4 py-4 space-y-3">
+        <nav className="lg:hidden bg-linear-to-b from-red-700 to-red-800 px-4 py-4 space-y-2 border-t border-red-600/50">
           <Link
             to="/"
             onClick={() => setIsMenuOpen(false)}
-            className="block py-2 hover:bg-red-800 rounded px-3 transition"
+            className="block py-2.5 hover:bg-white/10 rounded-lg px-4 transition-all duration-200 font-medium"
           >
-            Trang chủ
+            <i className="fa-solid fa-house mr-3 w-5 text-center"></i>Trang chủ
           </Link>
           <Link
             to="/members"
             onClick={() => setIsMenuOpen(false)}
-            className="block py-2 hover:bg-red-800 rounded px-3 transition"
+            className="block py-2.5 hover:bg-white/10 rounded-lg px-4 transition-all duration-200 font-medium"
           >
-            Thành viên
+            <i className="fa-solid fa-users mr-3 w-5 text-center"></i>Thành viên
           </Link>
-          <Link
-            to="/customs"
-            onClick={() => setIsMenuOpen(false)}
-            className="block py-2 hover:bg-red-800 rounded px-3 transition"
-          >
-            Custom Game
-          </Link>
-          <Link
-            to="/news"
-            onClick={() => setIsMenuOpen(false)}
-            className="block py-2 hover:bg-red-800 rounded px-3 transition"
-          >
-            Tin tức
-          </Link>
+
+          {/* Dropdown items in mobile */}
+          <div className="border-t border-white/20 pt-2 mt-2">
+            <p className="text-xs text-white/60 px-4 mb-2 uppercase tracking-wider">
+              Hoạt động
+            </p>
+            {dropdownItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => setIsMenuOpen(false)}
+                className={`block py-2.5 hover:bg-white/10 rounded-lg px-4 transition-all duration-200 font-medium ${
+                  location.pathname.startsWith(item.path) ? "bg-white/20" : ""
+                }`}
+              >
+                <i className={`fa-solid ${item.icon} mr-3 w-5 text-center`}></i>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+
           {user ? (
             <>
-              <Link
-                to="/profile"
-                onClick={() => setIsMenuOpen(false)}
-                className="block py-2 hover:bg-red-800 rounded px-3 transition"
-              >
-                Cá nhân
-              </Link>
-              {(user.role === "leader" ||
-                user.role === "organizer" ||
-                user.role === "moderator") && (
+              <div className="border-t border-white/20 pt-2 mt-2">
                 <Link
-                  to="/messages"
+                  to="/profile"
                   onClick={() => setIsMenuOpen(false)}
-                  className="block py-2 hover:bg-red-800 rounded px-3 transition"
+                  className="block py-2.5 hover:bg-white/10 rounded-lg px-4 transition-all duration-200 font-medium"
                 >
-                  Tin nhắn
+                  <i className="fa-solid fa-user mr-3 w-5 text-center"></i>Cá
+                  nhân
                 </Link>
-              )}
-              {(user.role === "leader" || user.role === "organizer") && (
-                <Link
-                  to="/admin"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="block py-2 bg-red-800 hover:bg-red-900 rounded px-3 transition font-medium"
+                {(user.role === "leader" || user.role === "organizer") && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block py-2.5 bg-white/20 hover:bg-white/30 rounded-lg px-4 transition-all duration-200 font-semibold border border-white/20"
+                  >
+                    <i className="fa-solid fa-shield-halved mr-3 w-5 text-center"></i>
+                    Quản lý
+                  </Link>
+                )}
+              </div>
+              <div className="pt-2 border-t border-white/20 mt-2">
+                <button
+                  onClick={() => {
+                    logout();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full text-left py-2.5 bg-white text-red-600 hover:bg-red-50 rounded-lg px-4 font-semibold transition-all duration-200 shadow-md"
                 >
-                  Quản lý
-                </Link>
-              )}
-              <button
-                onClick={() => {
-                  logout();
-                  setIsMenuOpen(false);
-                }}
-                className="w-full text-left py-2 bg-white text-red-600 hover:bg-gray-100 rounded px-3 font-medium transition"
-              >
-                Đăng xuất
-              </button>
+                  <i className="fa-solid fa-right-from-bracket mr-3 w-5 text-center"></i>
+                  Đăng xuất
+                </button>
+              </div>
             </>
           ) : (
-            <>
+            <div className="pt-2 border-t border-white/20 mt-2 space-y-2">
               <Link
                 to="/login"
                 onClick={() => setIsMenuOpen(false)}
-                className="block py-2 bg-white text-red-600 hover:bg-gray-100 rounded px-3 font-medium transition text-center"
+                className="block py-2.5 bg-white text-red-600 hover:bg-red-50 rounded-lg px-4 font-semibold transition-all duration-200 text-center shadow-md"
               >
-                Đăng nhập
+                <i className="fa-solid fa-right-to-bracket mr-2"></i>Đăng nhập
               </Link>
               <Link
                 to="/register"
                 onClick={() => setIsMenuOpen(false)}
-                className="block py-2 bg-black text-white hover:bg-gray-800 rounded px-3 font-medium transition text-center"
+                className="block py-2.5 bg-gray-900 text-white hover:bg-gray-800 rounded-lg px-4 font-semibold transition-all duration-200 text-center shadow-md"
               >
-                Đăng ký
+                <i className="fa-solid fa-user-plus mr-2"></i>Đăng ký
               </Link>
-            </>
+            </div>
           )}
         </nav>
       )}
