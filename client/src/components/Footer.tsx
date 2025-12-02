@@ -6,7 +6,9 @@ export default function Footer() {
           {/* About Section */}
           <div>
             <h3 className="text-xl font-bold text-white! mb-4 flex items-center gap-2">
-              <span>🎮</span>
+              <span>
+                <i className="fa-solid fa-gamepad text-red-500"></i>
+              </span>
               <span>BX Clan</span>
             </h3>
             <p className="text-sm text-gray-400 mb-4">
@@ -158,8 +160,11 @@ export default function Footer() {
         <div className="border-t border-gray-800 pt-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-500">
             <p>
-              Made with <span className="text-red-500">❤️</span> for the Wild
-              Rift community - website version 1.2.0
+              Made with{" "}
+              <span className="text-red-500">
+                <i className="fa-solid fa-heart"></i>
+              </span>{" "}
+              for the Wild Rift community - website version 1.2.2
             </p>
             <div className="flex gap-4">
               <a

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Header from "./components/Header";
@@ -20,9 +21,16 @@ import CustomDetailPage from "./pages/CustomDetailPage";
 import NewsPage from "./pages/NewsPage";
 import NewsDetailPage from "./pages/NewsDetailPage";
 import RegistrationPage from "./pages/RegistrationPage";
+import { preventCopyAndSelection } from "./utils/preventCopy";
 
 // vercel / render reload backend ping helper
 export default function App() {
+  // Apply copy prevention on Windows
+  useEffect(() => {
+    const cleanup = preventCopyAndSelection();
+    return cleanup;
+  }, []);
+
   return (
     <AuthProvider>
       <div className="app-container min-h-screen flex flex-col bg-white text-gray-900">

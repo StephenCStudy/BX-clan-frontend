@@ -75,32 +75,34 @@ export default function RegistrationPage() {
   }
 
   return (
-    <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
-      <h1 className="text-2xl md:text-4xl font-bold text-red-600 mb-6">
-        📝 Đăng ký tham gia
+    <div className="w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+      <h1 className="text-2xl md:text-4xl font-bold text-red-600 mb-6 flex items-center gap-2">
+        <i className="fa-solid fa-pen-to-square"></i> Đăng ký tham gia
       </h1>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b-2 border-gray-200">
         <button
           onClick={() => setActiveTab("news")}
-          className={`px-6 py-3 font-semibold transition-all ${
+          className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 ${
             activeTab === "news"
               ? "text-red-600 border-b-4 border-red-600"
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          📰 Tin tức tạo phòng ({newsItems.length})
+          <i className="fa-solid fa-newspaper"></i> Tin tức tạo phòng (
+          {newsItems.length})
         </button>
         <button
           onClick={() => setActiveTab("rooms")}
-          className={`px-6 py-3 font-semibold transition-all ${
+          className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 ${
             activeTab === "rooms"
               ? "text-red-600 border-b-4 border-red-600"
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          🏠 Phòng đang mở ({customRooms.length})
+          <i className="fa-solid fa-house"></i> Phòng đang mở (
+          {customRooms.length})
         </button>
       </div>
 
@@ -127,15 +129,16 @@ export default function RegistrationPage() {
                     <p className="text-gray-700 mb-3 line-clamp-3">
                       {news.content}
                     </p>
-                    <p className="text-sm text-gray-500">
-                      📅 {new Date(news.createdAt).toLocaleDateString("vi-VN")}
+                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                      <i className="fa-regular fa-calendar"></i>{" "}
+                      {new Date(news.createdAt).toLocaleDateString("vi-VN")}
                     </p>
                   </div>
                   <button
                     onClick={() => registerForNews(news._id)}
-                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold shadow-md transition whitespace-nowrap"
+                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold shadow-md transition whitespace-nowrap flex items-center gap-2"
                   >
-                    📝 Đăng ký ngay
+                    <i className="fa-solid fa-pen-to-square"></i> Đăng ký ngay
                   </button>
                 </div>
               </div>
@@ -171,14 +174,15 @@ export default function RegistrationPage() {
                   {room.description || "Không có mô tả"}
                 </p>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-500">
-                    🕒 {new Date(room.scheduleTime).toLocaleString("vi-VN")}
+                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <i className="fa-regular fa-clock"></i>{" "}
+                    {new Date(room.scheduleTime).toLocaleString("vi-VN")}
                   </p>
                   <button
                     onClick={() => registerForRoom(room._id)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-md transition"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-md transition flex items-center gap-2"
                   >
-                    ➕ Tham gia
+                    <i className="fa-solid fa-plus"></i> Tham gia
                   </button>
                 </div>
               </div>

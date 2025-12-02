@@ -3,7 +3,8 @@ import { useAuth } from "../../context/AuthContext";
 import { upload } from "../../utils";
 import { http } from "../../utils/http";
 import { toast } from "react-toastify";
-import { io, Socket } from "socket.io-client";
+import { Socket } from "socket.io-client";
+import { createSocket } from "../../utils/socket";
 import { getRankColors, getLaneColors } from "../../utils/rankLaneColors";
 import NotificationModal from "../../components/NotificationModal";
 
@@ -228,8 +229,8 @@ function AvatarModal({
           </div>
           <label className="block">
             <div className="w-full py-3 px-4 rounded-lg border-2 border-dashed border-gray-300 hover:border-purple-500 text-center cursor-pointer bg-gray-50 hover:bg-purple-50 transition">
-              <span className="text-purple-600 font-semibold">
-                📷 Chọn ảnh mới
+              <span className="text-purple-600 font-semibold inline-flex items-center gap-1">
+                <i className="fa-solid fa-camera"></i> Chọn ảnh mới
               </span>
               <input
                 type="file"
@@ -294,10 +295,6 @@ export default function ProfilePage() {
   const selectedAdminRef = useRef<string | null>(null);
   const prevMessagesLengthRef = useRef<number>(0);
   const isInitialLoadRef = useRef<boolean>(true);
-  const SOCKET_URL = useMemo(
-    () => import.meta.env.VITE_SOCKET_URL || "http://localhost:5000",
-    []
-  );
 
   const handleAvatarUpload = async (file: File) => {
     setUploading(true);
@@ -459,7 +456,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!user) return;
 
-    const s = io(SOCKET_URL);
+    const s = createSocket();
     s.emit("user:join", user.id);
 
     const appendIfActive = (msg: PrivateChatMessage) => {
@@ -470,17 +467,24 @@ export default function ProfilePage() {
       }
     };
 
+    // Listen for realtime notifications
+    s.on("notification:new", (notification: any) => {
+      setNotifications((prev) => [notification, ...prev]);
+      toast.info(notification.title);
+    });
+
     s.on("private:receive", appendIfActive);
     s.on("private:sent", appendIfActive);
 
     socketRef.current = s;
 
     return () => {
+      s.off("notification:new");
       s.off("private:receive", appendIfActive);
       s.off("private:sent", appendIfActive);
       s.disconnect();
     };
-  }, [SOCKET_URL, user]);
+  }, [user]);
 
   // Load conversation when admin selection changes
   useEffect(() => {
@@ -504,7 +508,7 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+    <div className="w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
       <div className="relative mb-6 md:mb-8">
         <div className="h-48 rounded-2xl bg-linear-to-r from-rose-500 via-red-600 to-orange-500 shadow-2xl overflow-hidden">
           <div className="h-full w-full flex items-center justify-between px-6 bg-linear-to-b from-transparent to-black/20">
@@ -527,19 +531,29 @@ export default function ProfilePage() {
                       : "bg-white/20 text-white border-white/40"
                   }`}
                 >
-                  {user.role === "leader"
-                    ? "👑 Trưởng Clan"
-                    : user.role === "organizer"
-                    ? "🎯 Ban Tổ Chức"
-                    : user.role === "moderator"
-                    ? "🛡️ Quản Trị Viên"
-                    : "👤 Thành Viên"}
+                  {user.role === "leader" ? (
+                    <>
+                      <i className="fa-solid fa-crown"></i> Trưởng Clan
+                    </>
+                  ) : user.role === "organizer" ? (
+                    <>
+                      <i className="fa-solid fa-bullseye"></i> Ban Tổ Chức
+                    </>
+                  ) : user.role === "moderator" ? (
+                    <>
+                      <i className="fa-solid fa-shield"></i> Quản Trị Viên
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-user"></i> Thành Viên
+                    </>
+                  )}
                 </span>
                 <button
                   onClick={() => setShowNotifications(true)}
-                  className="relative px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 border-2 border-white/40 text-white text-xs md:text-sm font-semibold transition"
+                  className="relative px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 border-2 border-white/40 text-white text-xs md:text-sm font-semibold transition inline-flex items-center gap-1"
                 >
-                  🔔 Thông báo
+                  <i className="fa-solid fa-bell"></i> Thông báo
                   {notifications.filter((n) => !n.isRead).length > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                       {notifications.filter((n) => !n.isRead).length}
@@ -618,13 +632,23 @@ export default function ProfilePage() {
                         : "bg-gray-100 text-gray-800 border-2 border-gray-300"
                     }`}
                   >
-                    {user.role === "leader"
-                      ? "👑 Trưởng Clan"
-                      : user.role === "organizer"
-                      ? "🎯 Ban Tổ Chức"
-                      : user.role === "moderator"
-                      ? "🛡️ Quản Trị Viên"
-                      : "👤 Thành Viên"}
+                    {user.role === "leader" ? (
+                      <>
+                        <i className="fa-solid fa-crown"></i> Trưởng Clan
+                      </>
+                    ) : user.role === "organizer" ? (
+                      <>
+                        <i className="fa-solid fa-bullseye"></i> Ban Tổ Chức
+                      </>
+                    ) : user.role === "moderator" ? (
+                      <>
+                        <i className="fa-solid fa-shield"></i> Quản Trị Viên
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa-solid fa-user"></i> Thành Viên
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -705,9 +729,9 @@ export default function ProfilePage() {
 
                 <button
                   onClick={() => setEditModalOpen(true)}
-                  className="w-full py-2 md:py-3 rounded-xl text-white text-sm md:text-base font-bold bg-linear-to-r from-purple-500 via-pink-500 to-red-500 hover:from-purple-600 hover:via-pink-600 hover:to-red-600 shadow-lg transition"
+                  className="w-full py-2 md:py-3 rounded-xl text-white text-sm md:text-base font-bold bg-linear-to-r from-purple-500 via-pink-500 to-red-500 hover:from-purple-600 hover:via-pink-600 hover:to-red-600 shadow-lg transition inline-flex items-center justify-center gap-2"
                 >
-                  ✏️ Chỉnh sửa hồ sơ
+                  <i className="fa-solid fa-pen"></i> Chỉnh sửa hồ sơ
                 </button>
               </div>
             </div>
@@ -718,7 +742,10 @@ export default function ProfilePage() {
         <div className="lg:col-span-1">
           <div className="bg-white rounded-2xl border-2 border-gray-200 p-4 md:p-6 shadow-xl">
             <h2 className="text-base md:text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
-              <span>💬</span> Liên hệ quản trị
+              <span>
+                <i className="fa-solid fa-comments"></i>
+              </span>{" "}
+              Liên hệ quản trị
             </h2>
             <div className="mb-4">
               <label className="block text-xs md:text-sm text-gray-600 font-medium mb-2">
@@ -732,10 +759,10 @@ export default function ProfilePage() {
                 {admins.map((a) => {
                   const roleLabel =
                     a.role === "leader"
-                      ? "👑 Tộc trưởng"
+                      ? "Tộc trưởng"
                       : a.role === "organizer"
-                      ? "⭐ Tổ chức"
-                      : "🛡️ Điều hành";
+                      ? "Tổ chức"
+                      : "Điều hành";
                   return (
                     <option key={a._id} value={a._id}>
                       {roleLabel} - {a.ingameName || a.username}
@@ -826,8 +853,9 @@ export default function ProfilePage() {
                 Gửi
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-3">
-              💡 Tin nhắn sẽ được gửi tới quản trị viên đã chọn.
+            <p className="text-xs text-gray-500 mt-3 inline-flex items-center gap-1">
+              <i className="fa-solid fa-lightbulb"></i> Tin nhắn sẽ được gửi tới
+              quản trị viên đã chọn.
             </p>
           </div>
         </div>

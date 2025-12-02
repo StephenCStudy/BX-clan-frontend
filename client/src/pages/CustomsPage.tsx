@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { http } from "../utils/http";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import ConfirmModal from "../components/ConfirmModal";
+import { createSocket } from "../utils/socket";
+import { Socket } from "socket.io-client";
 
 interface CustomRoom {
   _id: string;
@@ -55,12 +57,38 @@ export default function CustomsPage() {
     parseInt(searchParams.get("page") || "1")
   );
   const [totalPages, setTotalPages] = useState(1);
+  const socketRef = useRef<Socket | null>(null);
   const gameModeOptions = [
-    { value: "5vs5", label: "🗺️ 5vs5 - Summoner's Rift" },
-    { value: "aram", label: "🌉 ARAM - Howling Abyss" },
-    { value: "draft", label: "🏆 Giải đấu cấm chọn" },
-    { value: "minigame", label: "🎮 Minigame" },
+    { value: "5vs5", label: "5vs5 - Summoner's Rift" },
+    { value: "aram", label: "ARAM - Howling Abyss" },
+    { value: "draft", label: "Giải đấu cấm chọn" },
+    { value: "minigame", label: "Minigame" },
   ];
+
+  // Socket connection for realtime updates
+  useEffect(() => {
+    const socket = createSocket();
+    socketRef.current = socket;
+
+    // Listen for new rooms created
+    socket.on("custom:created", (_newRoom: CustomRoom) => {
+      // Reload to get accurate pagination
+      loadCustoms();
+    });
+
+    // Listen for room updates
+    socket.on("custom:updated", (updatedRoom: CustomRoom) => {
+      setCustoms((prev) =>
+        prev.map((c) => (c._id === updatedRoom._id ? updatedRoom : c))
+      );
+    });
+
+    return () => {
+      socket.off("custom:created");
+      socket.off("custom:updated");
+      socket.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     loadCustoms();
@@ -177,7 +205,7 @@ export default function CustomsPage() {
   const isMember = user && user.role === "member";
 
   return (
-    <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+    <div className="w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
       <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
         <h1 className="text-xl md:text-3xl lg:text-4xl font-bold text-red-600">
           Custom Games
@@ -193,9 +221,9 @@ export default function CustomsPage() {
         {isMember && (
           <Link
             to="/registration"
-            className="px-3 md:px-5 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs md:text-sm font-medium shadow-md transition whitespace-nowrap"
+            className="px-3 md:px-5 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs md:text-sm font-medium shadow-md transition whitespace-nowrap inline-flex items-center gap-1"
           >
-            📝 Đăng ký
+            <i className="fa-solid fa-pen-to-square"></i> Đăng ký
           </Link>
         )}
       </div>
@@ -204,7 +232,7 @@ export default function CustomsPage() {
       <div className="mb-4 flex flex-col md:flex-row gap-3 animate-fade-in-up">
         <input
           type="text"
-          placeholder="🔍 Tìm kiếm theo tên phòng..."
+          placeholder="Tìm kiếm theo tên phòng..."
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);
@@ -220,11 +248,11 @@ export default function CustomsPage() {
           }}
           className="md:w-48 p-3 text-sm bg-white rounded-lg border-2 border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 transition-smooth gpu-accelerated"
         >
-          <option value="all">📋 Tất cả trạng thái</option>
-          <option value="open">🟢 Đang mở</option>
-          <option value="playing">🎮 Đang chơi</option>
-          <option value="full">🔴 Đã đầy</option>
-          <option value="closed">🔒 Đã đóng</option>
+          <option value="all">Tất cả trạng thái</option>
+          <option value="open">Đang mở</option>
+          <option value="playing">Đang chơi</option>
+          <option value="full">Đã đầy</option>
+          <option value="closed">Đã đóng</option>
         </select>
       </div>
 
@@ -234,7 +262,9 @@ export default function CustomsPage() {
           className="bg-white rounded-xl border-2 border-gray-200 p-3 md:p-6 mb-4 md:mb-6 shadow-lg animate-scale-in gpu-accelerated"
         >
           <h2 className="text-lg md:text-2xl font-semibold text-red-600 mb-3 md:mb-4 flex items-center gap-2">
-            <span className="animate-pulse">🎮</span>
+            <span className="animate-pulse">
+              <i className="fa-solid fa-gamepad"></i>
+            </span>
             Tạo Custom mới
           </h2>
           <div className="space-y-3">
@@ -374,7 +404,7 @@ export default function CustomsPage() {
                               onClick={() => toggleMember(m)}
                               className="text-red-500 hover:text-red-700 text-xs transition-smooth hover-shrink"
                             >
-                              ✕
+                              <i className="fa-solid fa-xmark"></i>
                             </button>
                           </div>
                         ))}
@@ -407,7 +437,7 @@ export default function CustomsPage() {
                               onClick={() => toggleMember(m)}
                               className="text-red-500 hover:text-red-700 text-xs transition-smooth hover-shrink"
                             >
-                              ✕
+                              <i className="fa-solid fa-xmark"></i>
                             </button>
                           </div>
                         ))}
@@ -457,7 +487,9 @@ export default function CustomsPage() {
                             </div>
                           </div>
                           {isSelected && (
-                            <span className="text-green-600 font-bold">✓</span>
+                            <span className="text-green-600 font-bold">
+                              <i className="fa-solid fa-check"></i>
+                            </span>
                           )}
                         </button>
                       );
@@ -597,11 +629,13 @@ export default function CustomsPage() {
                 )}
 
               <div className="flex items-center justify-between text-xs text-gray-500">
-                <span className="truncate">
-                  🕒 {new Date(c.scheduleTime).toLocaleString("vi-VN")}
+                <span className="truncate inline-flex items-center gap-1">
+                  <i className="fa-regular fa-clock"></i>{" "}
+                  {new Date(c.scheduleTime).toLocaleString("vi-VN")}
                 </span>
-                <span className="ml-2 whitespace-nowrap">
-                  👥 {c.players?.length || 0}/{c.maxPlayers}
+                <span className="ml-2 whitespace-nowrap inline-flex items-center gap-1">
+                  <i className="fa-solid fa-users"></i> {c.players?.length || 0}
+                  /{c.maxPlayers}
                 </span>
               </div>
             </Link>

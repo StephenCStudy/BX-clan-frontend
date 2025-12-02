@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { http } from "../utils/http";
 import { useAuth } from "../context/AuthContext";
 import BackButton from "../components/BackButton";
 import ConfirmModal from "../components/ConfirmModal";
 import { toast } from "react-toastify";
+import { createSocket } from "../utils/socket";
+import { Socket } from "socket.io-client";
 
 interface Custom {
   _id: string;
@@ -83,11 +85,12 @@ export default function CustomDetailPage() {
   const [showTeamEditModal, setShowTeamEditModal] = useState(false);
   const [editTeam1, setEditTeam1] = useState<any[]>([]);
   const [editTeam2, setEditTeam2] = useState<any[]>([]);
+  const socketRef = useRef<Socket | null>(null);
   const gameModeOptions = [
-    { value: "5vs5", label: "🗺️ 5vs5 - Summoner's Rift" },
-    { value: "aram", label: "🌉 ARAM - Howling Abyss" },
-    { value: "draft", label: "🏆 Giải đấu cấm chọn" },
-    { value: "minigame", label: "🎮 Minigame" },
+    { value: "5vs5", label: "5vs5 - Summoner's Rift" },
+    { value: "aram", label: "ARAM - Howling Abyss" },
+    { value: "draft", label: "Giải đấu cấm chọn" },
+    { value: "minigame", label: "Minigame" },
   ];
   const laneOptions = [
     { key: "Baron", icon: "🛡️", label: "Baron" },
@@ -293,6 +296,34 @@ export default function CustomDetailPage() {
       console.error("Error loading chat:", err);
     }
   };
+
+  // Socket connection for realtime updates
+  useEffect(() => {
+    if (!id) return;
+
+    const socket = createSocket();
+    socketRef.current = socket;
+
+    // Listen for room updates (invites approved, members added/removed)
+    socket.on("custom:updated", (updatedRoom: any) => {
+      if (updatedRoom._id === id) {
+        setCustom(updatedRoom);
+      }
+    });
+
+    // Listen for invite updates
+    socket.on("invite:created", (data: any) => {
+      if (data.roomId === id) {
+        loadPendingInvites();
+      }
+    });
+
+    return () => {
+      socket.off("custom:updated");
+      socket.off("invite:created");
+      socket.disconnect();
+    };
+  }, [id]);
 
   useEffect(() => {
     (async () => {
@@ -506,15 +537,17 @@ export default function CustomDetailPage() {
                 )}
               </div>
               <div className="flex flex-wrap gap-4 text-sm">
-                <span className="px-3 py-1 bg-gray-100 rounded-full">
-                  📅 {new Date(custom.scheduleTime).toLocaleString("vi-VN")}
+                <span className="px-3 py-1 bg-gray-100 rounded-full inline-flex items-center gap-1">
+                  <i className="fa-solid fa-calendar"></i>{" "}
+                  {new Date(custom.scheduleTime).toLocaleString("vi-VN")}
                 </span>
-                <span className="px-3 py-1 bg-gray-100 rounded-full">
-                  👥 {teamA.length + teamB.length}/{custom.maxPlayers} players
+                <span className="px-3 py-1 bg-gray-100 rounded-full inline-flex items-center gap-1">
+                  <i className="fa-solid fa-users"></i>{" "}
+                  {teamA.length + teamB.length}/{custom.maxPlayers} players
                 </span>
                 <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold">
                   {gameModeOptions.find((m) => m.value === custom.gameMode)
-                    ?.label || "🗺️ 5vs5"}
+                    ?.label || "5vs5"}
                 </span>
                 <span
                   className={`px-3 py-1 rounded-full font-semibold ${
@@ -525,11 +558,20 @@ export default function CustomDetailPage() {
                       : "bg-gray-100 text-gray-700"
                   }`}
                 >
-                  {custom.status === "open"
-                    ? "🟢 Mở"
-                    : custom.status === "ongoing"
-                    ? "🔵 Đang chơi"
-                    : "⚫ Đóng"}
+                  {custom.status === "open" ? (
+                    <>
+                      <i className="fa-solid fa-circle text-green-500"></i> Mở
+                    </>
+                  ) : custom.status === "ongoing" ? (
+                    <>
+                      <i className="fa-solid fa-circle text-blue-500"></i> Đang
+                      chơi
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-circle text-gray-500"></i> Đóng
+                    </>
+                  )}
                 </span>
               </div>
             </>
@@ -675,15 +717,15 @@ export default function CustomDetailPage() {
             {/* Team Formation */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-800">
-                  ⚔️ Đội hình thi đấu
+                <h2 className="text-2xl font-bold text-gray-800 inline-flex items-center gap-2">
+                  <i className="fa-solid fa-shield-halved"></i> Đội hình thi đấu
                 </h2>
                 {canManage && (teamA.length > 0 || teamB.length > 0) && (
                   <button
                     onClick={openTeamEditModal}
-                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold"
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold inline-flex items-center gap-1"
                   >
-                    ✏️ Chỉnh sửa đội
+                    <i className="fa-solid fa-pen"></i> Chỉnh sửa đội
                   </button>
                 )}
               </div>
@@ -691,8 +733,9 @@ export default function CustomDetailPage() {
                 {/* Team A */}
                 <div className="bg-red-50 rounded-lg p-4 border-2 border-red-200">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-red-700">
-                      🔴 ĐỘI ĐỎ ({teamA.length}/5)
+                    <h3 className="font-bold text-red-700 inline-flex items-center gap-1">
+                      <i className="fa-solid fa-circle text-red-500"></i> ĐỘI ĐỎ
+                      ({teamA.length}/5)
                     </h3>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold text-red-700">
@@ -751,7 +794,7 @@ export default function CustomDetailPage() {
                                 className="p-1 text-red-500 hover:bg-red-100 rounded"
                                 title="Xóa khỏi phòng"
                               >
-                                ✕
+                                <i className="fa-solid fa-xmark"></i>
                               </button>
                             )}
                           </div>
@@ -768,8 +811,9 @@ export default function CustomDetailPage() {
                 {/* Team B */}
                 <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-bold text-blue-700">
-                      🔵 ĐỘI XANH ({teamB.length}/5)
+                    <h3 className="font-bold text-blue-700 inline-flex items-center gap-1">
+                      <i className="fa-solid fa-circle text-blue-500"></i> ĐỘI
+                      XANH ({teamB.length}/5)
                     </h3>
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold text-blue-700">
@@ -828,7 +872,7 @@ export default function CustomDetailPage() {
                                 className="p-1 text-red-500 hover:bg-red-100 rounded"
                                 title="Xóa khỏi phòng"
                               >
-                                ✕
+                                <i className="fa-solid fa-xmark"></i>
                               </button>
                             )}
                           </div>
@@ -846,8 +890,8 @@ export default function CustomDetailPage() {
 
             {/* Stats & Chart */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                📊 Thống kê trận đấu
+              <h2 className="text-2xl font-bold text-gray-800 mb-4 inline-flex items-center gap-2">
+                <i className="fa-solid fa-chart-bar"></i> Thống kê trận đấu
               </h2>
               <div className="mb-4 text-center">
                 <span className="inline-block px-4 py-2 bg-linear-to-r from-red-100 to-blue-100 rounded-lg border-2 border-gray-300">
@@ -923,12 +967,14 @@ export default function CustomDetailPage() {
 
             {/* Video/Livestream */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                📺 Video / Livestream
+              <h2 className="text-2xl font-bold text-gray-800 mb-4 inline-flex items-center gap-2">
+                <i className="fa-solid fa-tv"></i> Video / Livestream
               </h2>
               <div className="aspect-video bg-gray-900 rounded-lg flex items-center justify-center">
                 <div className="text-center text-gray-400">
-                  <div className="text-4xl mb-2">🎥</div>
+                  <div className="text-4xl mb-2">
+                    <i className="fa-solid fa-video"></i>
+                  </div>
                   <div>Stream sẽ bắt đầu khi trận đấu diễn ra</div>
                 </div>
               </div>
@@ -943,9 +989,9 @@ export default function CustomDetailPage() {
                 {!showRegForm ? (
                   <button
                     onClick={() => setShowRegForm(true)}
-                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition shadow-lg hover:shadow-xl"
+                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition shadow-lg hover:shadow-xl inline-flex items-center justify-center gap-2"
                   >
-                    🎮 Đăng ký tham gia
+                    <i className="fa-solid fa-gamepad"></i> Đăng ký tham gia
                   </button>
                 ) : (
                   <form onSubmit={register} className="space-y-4">
@@ -1031,16 +1077,16 @@ export default function CustomDetailPage() {
 
             {hasRegistered && (
               <div className="bg-green-50 rounded-xl shadow-lg p-6 border-2 border-green-200">
-                <div className="text-center text-green-700 font-semibold">
-                  ✅ Bạn đã đăng ký!
+                <div className="text-center text-green-700 font-semibold inline-flex items-center justify-center gap-2">
+                  <i className="fa-solid fa-circle-check"></i> Bạn đã đăng ký!
                 </div>
               </div>
             )}
 
             {/* Chat Section */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
-                💬 Thảo luận
+              <h2 className="text-xl font-bold text-gray-800 mb-4 inline-flex items-center gap-2">
+                <i className="fa-solid fa-comments"></i> Thảo luận
               </h2>
               <div
                 id="chat-messages"
@@ -1124,21 +1170,21 @@ export default function CustomDetailPage() {
             {/* Registered Members Section */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-800">
-                  👥 Danh sách đăng ký
+                <h2 className="text-xl font-bold text-gray-800 inline-flex items-center gap-2">
+                  <i className="fa-solid fa-users"></i> Danh sách đăng ký
                 </h2>
                 {user && (
                   <button
                     onClick={() => setShowInviteModal(true)}
                     disabled={teamA.length + teamB.length >= 10}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm shadow-md transition"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm shadow-md transition inline-flex items-center gap-1"
                     title={
                       teamA.length + teamB.length >= 10
                         ? "Phòng đã đủ 10 người"
                         : "Mời thành viên"
                     }
                   >
-                    ✉️ Mời thành viên
+                    <i className="fa-solid fa-envelope"></i> Mời thành viên
                   </button>
                 )}
               </div>
@@ -1146,8 +1192,9 @@ export default function CustomDetailPage() {
               {/* Pending Invites (Admin Only) */}
               {canManage && pendingInvites.length > 0 && (
                 <div className="mb-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200">
-                  <h3 className="text-sm font-bold text-yellow-800 mb-3">
-                    ⏳ Lời mời chờ duyệt ({pendingInvites.length})
+                  <h3 className="text-sm font-bold text-yellow-800 mb-3 inline-flex items-center gap-1">
+                    <i className="fa-solid fa-hourglass-half"></i> Lời mời chờ
+                    duyệt ({pendingInvites.length})
                   </h3>
                   <div className="space-y-2">
                     {pendingInvites.map((invite) => (
@@ -1174,15 +1221,15 @@ export default function CustomDetailPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => approveInvite(invite._id)}
-                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold"
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold inline-flex items-center gap-1"
                           >
-                            ✓ Chấp nhận
+                            <i className="fa-solid fa-check"></i> Chấp nhận
                           </button>
                           <button
                             onClick={() => rejectInvite(invite._id)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold"
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold inline-flex items-center gap-1"
                           >
-                            ✕ Từ chối
+                            <i className="fa-solid fa-xmark"></i> Từ chối
                           </button>
                         </div>
                       </div>
@@ -1192,7 +1239,9 @@ export default function CustomDetailPage() {
               )}
               {teamA.length === 0 && teamB.length === 0 ? (
                 <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-gray-200">
-                  <div className="text-4xl mb-2">📭</div>
+                  <div className="text-4xl mb-2">
+                    <i className="fa-solid fa-inbox"></i>
+                  </div>
                   <p className="text-gray-500 font-medium">
                     Chưa có thành viên nào đăng ký
                   </p>
@@ -1200,7 +1249,9 @@ export default function CustomDetailPage() {
               ) : teamA.length + teamB.length >= 10 ? (
                 <div className="space-y-4">
                   <div className="text-center py-6 bg-yellow-50 rounded-lg border-2 border-yellow-300">
-                    <div className="text-4xl mb-2">✅</div>
+                    <div className="text-4xl mb-2">
+                      <i className="fa-solid fa-circle-check text-green-500"></i>
+                    </div>
                     <p className="text-yellow-700 font-bold text-lg">
                       Đã đủ 10 người!
                     </p>
@@ -1211,8 +1262,7 @@ export default function CustomDetailPage() {
                   <div className="max-h-96 overflow-y-auto space-y-3">
                     {[...teamA, ...teamB].map((member: any, index) => {
                       const memberUser = member.user || member;
-                      const teamLabel =
-                        index < teamA.length ? "🔴 Đội Đỏ" : "🔵 Đội Xanh";
+                      const isTeam1 = index < teamA.length;
 
                       return (
                         <div
@@ -1235,8 +1285,13 @@ export default function CustomDetailPage() {
                               {memberUser.ingameName}
                             </div>
                           </div>
-                          <span className="px-3 py-1 bg-white rounded-full text-xs font-semibold border border-gray-300 whitespace-nowrap">
-                            {teamLabel}
+                          <span className="px-3 py-1 bg-white rounded-full text-xs font-semibold border border-gray-300 whitespace-nowrap inline-flex items-center gap-1">
+                            <i
+                              className={`fa-solid fa-circle ${
+                                isTeam1 ? "text-red-500" : "text-blue-500"
+                              }`}
+                            ></i>{" "}
+                            {isTeam1 ? "Đội Đỏ" : "Đội Xanh"}
                           </span>
                           {canManage && memberUser._id !== user?.id && (
                             <button
@@ -1246,7 +1301,7 @@ export default function CustomDetailPage() {
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
                               title="Xóa khỏi phòng"
                             >
-                              ✖️
+                              <i className="fa-solid fa-xmark"></i>
                             </button>
                           )}
                         </div>
@@ -1268,8 +1323,7 @@ export default function CustomDetailPage() {
                   <div className="max-h-96 overflow-y-auto space-y-3">
                     {[...teamA, ...teamB].map((member: any, index) => {
                       const memberUser = member.user || member;
-                      const teamLabel =
-                        index < teamA.length ? "🔴 Đội Đỏ" : "🔵 Đội Xanh";
+                      const isTeam1 = index < teamA.length;
 
                       return (
                         <div
@@ -1292,8 +1346,13 @@ export default function CustomDetailPage() {
                               {memberUser.ingameName}
                             </div>
                           </div>
-                          <span className="px-3 py-1 bg-white rounded-full text-xs font-semibold border border-gray-300 whitespace-nowrap">
-                            {teamLabel}
+                          <span className="px-3 py-1 bg-white rounded-full text-xs font-semibold border border-gray-300 whitespace-nowrap inline-flex items-center gap-1">
+                            <i
+                              className={`fa-solid fa-circle ${
+                                isTeam1 ? "text-red-500" : "text-blue-500"
+                              }`}
+                            ></i>{" "}
+                            {isTeam1 ? "Đội Đỏ" : "Đội Xanh"}
                           </span>
                           {canManage && memberUser._id !== user?.id && (
                             <button
@@ -1303,7 +1362,7 @@ export default function CustomDetailPage() {
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
                               title="Xóa khỏi phòng"
                             >
-                              ✖️
+                              <i className="fa-solid fa-xmark"></i>
                             </button>
                           )}
                         </div>
@@ -1325,8 +1384,8 @@ export default function CustomDetailPage() {
             style={{ maxHeight: "85vh" }}
           >
             <div className="p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">
-                ✉️ Mời thành viên
+              <h3 className="text-xl font-bold text-gray-900 inline-flex items-center gap-2">
+                <i className="fa-solid fa-envelope"></i> Mời thành viên
               </h3>
               <p className="text-sm text-gray-600 mt-1">
                 Chọn thành viên để gửi lời mời tham gia phòng (có thể chọn
@@ -1369,7 +1428,9 @@ export default function CustomDetailPage() {
                 if (availableMembers.length === 0) {
                   return (
                     <div className="text-center py-8 text-gray-500">
-                      <div className="text-4xl mb-2">📭</div>
+                      <div className="text-4xl mb-2">
+                        <i className="fa-solid fa-inbox"></i>
+                      </div>
                       <p>Không còn thành viên nào để mời</p>
                     </div>
                   );
@@ -1399,7 +1460,9 @@ export default function CustomDetailPage() {
                       </div>
                     </div>
                     {selectedInvites.includes(member._id) && (
-                      <span className="text-blue-600 font-bold text-xl">✓</span>
+                      <span className="text-blue-600 font-bold text-xl">
+                        <i className="fa-solid fa-check"></i>
+                      </span>
                     )}
                   </button>
                 ));
@@ -1445,8 +1508,8 @@ export default function CustomDetailPage() {
             style={{ maxHeight: "85vh" }}
           >
             <div className="p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">
-                ✏️ Chỉnh sửa đội hình
+              <h3 className="text-xl font-bold text-gray-900 inline-flex items-center gap-2">
+                <i className="fa-solid fa-pen-to-square"></i> Chỉnh sửa đội hình
               </h3>
               <p className="text-sm text-gray-600 mt-1">
                 Kéo thả hoặc click để chuyển thành viên giữa 2 đội
@@ -1456,8 +1519,9 @@ export default function CustomDetailPage() {
               <div className="grid md:grid-cols-2 gap-4">
                 {/* Edit Team 1 */}
                 <div className="bg-red-50 rounded-lg p-4 border-2 border-red-200">
-                  <h4 className="font-bold text-red-700 mb-3">
-                    🔴 ĐỘI ĐỎ ({editTeam1.length}/5)
+                  <h4 className="font-bold text-red-700 mb-3 inline-flex items-center gap-1">
+                    <i className="fa-solid fa-circle text-red-500"></i> ĐỘI ĐỎ (
+                    {editTeam1.length}/5)
                   </h4>
                   <div className="space-y-2 min-h-[200px]">
                     {editTeam1.map((member: any) => {
@@ -1501,8 +1565,9 @@ export default function CustomDetailPage() {
 
                 {/* Edit Team 2 */}
                 <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
-                  <h4 className="font-bold text-blue-700 mb-3">
-                    🔵 ĐỘI XANH ({editTeam2.length}/5)
+                  <h4 className="font-bold text-blue-700 mb-3 inline-flex items-center gap-1">
+                    <i className="fa-solid fa-circle text-blue-500"></i> ĐỘI
+                    XANH ({editTeam2.length}/5)
                   </h4>
                   <div className="space-y-2 min-h-[200px]">
                     {editTeam2.map((member: any) => {
@@ -1548,9 +1613,9 @@ export default function CustomDetailPage() {
             <div className="p-6 border-t border-gray-200 flex gap-2">
               <button
                 onClick={saveTeamChanges}
-                className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition"
+                className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition inline-flex items-center justify-center gap-2"
               >
-                💾 Lưu thay đổi
+                <i className="fa-solid fa-floppy-disk"></i> Lưu thay đổi
               </button>
               <button
                 onClick={() => setShowTeamEditModal(false)}

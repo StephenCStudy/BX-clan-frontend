@@ -92,7 +92,7 @@ export default function NewsPage() {
       user.role === "moderator");
 
   return (
-    <div className="w-full max-w-screen-lg mx-auto px-4 md:px-6 lg:px-8 py-6">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 lg:px-8">
       <div className="flex flex-row items-center justify-between mb-6 gap-2">
         <h1 className="text-2xl md:text-4xl font-bold text-red-600">
           Tin tức Clan
@@ -111,7 +111,7 @@ export default function NewsPage() {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="🔍 Tìm kiếm theo tiêu đề..."
+          placeholder="Tìm kiếm theo tiêu đề..."
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);
@@ -139,8 +139,8 @@ export default function NewsPage() {
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
               >
-                <option value="announcement">📢 Thông báo</option>
-                <option value="room-creation">🎮 Tạo phòng</option>
+                <option value="announcement">Thông báo</option>
+                <option value="room-creation">Tạo phòng</option>
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 {form.type === "announcement"

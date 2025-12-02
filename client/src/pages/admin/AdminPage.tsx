@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Link,
   useSearchParams,
@@ -8,6 +8,8 @@ import {
 import { http } from "../../utils/http";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
+import { createSocket } from "../../utils/socket";
+import type { Socket } from "socket.io-client";
 
 type Tab =
   | "overview"
@@ -69,6 +71,35 @@ export default function AdminPage() {
     useState(false);
   const [selectedRoomForParticipants, setSelectedRoomForParticipants] =
     useState<any>(null);
+  const socketRef = useRef<Socket | null>(null);
+
+  // Socket connection for realtime updates
+  useEffect(() => {
+    const socket = createSocket();
+    socketRef.current = socket;
+
+    socket.on("custom:created", () => {
+      // Refresh customs list when a new room is created
+      http.get("/customs", { params: { limit: 1000 } }).then((res) => {
+        const customsData = res.data.items || res.data;
+        setCustoms(customsData);
+        setStats((prev) => ({ ...prev, customs: customsData.length }));
+      });
+    });
+
+    socket.on("custom:updated", () => {
+      // Refresh customs list when a room is updated
+      http.get("/customs", { params: { limit: 1000 } }).then((res) => {
+        const customsData = res.data.items || res.data;
+        setCustoms(customsData);
+        setStats((prev) => ({ ...prev, customs: customsData.length }));
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   // Check permission - only leader or organizer can access AdminPage
   useEffect(() => {
@@ -96,15 +127,20 @@ export default function AdminPage() {
         const roomCreationNews = (n.data.items || n.data).filter(
           (item: any) => item.type === "room-creation"
         );
+        const customsData = c.data.items || c.data;
+        // Count active rooms (open + ongoing)
+        const activeRoomsCount = customsData.filter(
+          (room: any) => room.status === "open" || room.status === "ongoing"
+        ).length;
         setStats({
           members: m.data.length,
-          customs: c.data.items?.length || c.data.length,
+          customs: customsData.length,
           news: n.data.items?.length || n.data.length,
           reports: r.data.length,
-          rooms: roomCreationNews.length,
+          rooms: activeRoomsCount,
         });
         setMembers(m.data);
-        setCustoms(c.data.items || c.data);
+        setCustoms(customsData);
         setNews(n.data.items || n.data);
         setReports(r.data);
 
@@ -455,7 +491,9 @@ export default function AdminPage() {
                 <h3 className="text-lg font-bold text-emerald-800">
                   Hoạt động
                 </h3>
-                <span className="text-3xl">📊</span>
+                <span className="text-3xl text-emerald-600">
+                  <i className="fa-solid fa-chart-bar"></i>
+                </span>
               </div>
               <p className="text-3xl font-extrabold text-emerald-600 mb-2">
                 {parseInt(stats.customs?.toString() || "0", 10) +
@@ -470,7 +508,9 @@ export default function AdminPage() {
             <div className="bg-linear-to-br from-cyan-50 to-cyan-100 rounded-xl border-2 border-cyan-300 p-5 shadow-md">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-bold text-cyan-800">Tạo phòng</h3>
-                <span className="text-3xl">🏠</span>
+                <span className="text-3xl text-cyan-600">
+                  <i className="fa-solid fa-house"></i>
+                </span>
               </div>
               <p className="text-3xl font-extrabold text-cyan-600 mb-2">
                 {stats.rooms}
@@ -484,7 +524,9 @@ export default function AdminPage() {
                 <h3 className="text-lg font-bold text-purple-800">
                   Thành viên mới
                 </h3>
-                <span className="text-3xl">👥</span>
+                <span className="text-3xl text-purple-600">
+                  <i className="fa-solid fa-users"></i>
+                </span>
               </div>
               <p className="text-3xl font-extrabold text-purple-600 mb-2">
                 {
@@ -504,7 +546,9 @@ export default function AdminPage() {
             <div className="bg-linear-to-br from-amber-50 to-amber-100 rounded-xl border-2 border-amber-300 p-5 shadow-md">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-bold text-amber-800">Tin tức</h3>
-                <span className="text-3xl">📰</span>
+                <span className="text-3xl text-amber-600">
+                  <i className="fa-solid fa-newspaper"></i>
+                </span>
               </div>
               <p className="text-3xl font-extrabold text-amber-600 mb-2">
                 {stats.news}
@@ -518,7 +562,7 @@ export default function AdminPage() {
             {/* Recent News */}
             <div className="bg-white rounded-xl border-2 border-gray-200 p-5 shadow-md">
               <h3 className="text-xl font-bold mb-4 text-purple-600 flex items-center gap-2">
-                📰 Tin tức gần đây
+                <i className="fa-solid fa-newspaper"></i> Tin tức gần đây
               </h3>
               <div className="space-y-3">
                 {news.slice(0, 5).map((n: any) => (
@@ -550,7 +594,7 @@ export default function AdminPage() {
             {/* Recent Custom Rooms */}
             <div className="bg-white rounded-xl border-2 border-gray-200 p-5 shadow-md">
               <h3 className="text-xl font-bold mb-4 text-blue-600 flex items-center gap-2">
-                🎮 Custom games gần đây
+                <i className="fa-solid fa-gamepad"></i> Custom games gần đây
               </h3>
               <div className="space-y-3">
                 {customs.slice(0, 5).map((c: any) => (
@@ -580,7 +624,9 @@ export default function AdminPage() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-600 mt-1">
-                        👥 {c.players?.length || 0}/{c.maxPlayers} • 🕒{" "}
+                        <i className="fa-solid fa-users"></i>{" "}
+                        {c.players?.length || 0}/{c.maxPlayers} •{" "}
+                        <i className="fa-regular fa-clock"></i>{" "}
                         {new Date(c.scheduleTime).toLocaleDateString("vi-VN")}
                       </p>
                     </Link>
@@ -605,8 +651,8 @@ export default function AdminPage() {
               {/* Members by Role Chart */}
               <div className="bg-linear-to-br from-emerald-50 via-white to-teal-50 rounded-2xl p-6 border-2 border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
                 <h3 className="text-lg font-bold mb-5 text-emerald-700 flex items-center gap-2 border-b-2 border-emerald-100 pb-3">
-                  <span className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    👥
+                  <span className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600">
+                    <i className="fa-solid fa-users"></i>
                   </span>
                   Thành viên theo Role
                 </h3>
@@ -693,8 +739,8 @@ export default function AdminPage() {
               {/* Rooms by Time Period Chart */}
               <div className="bg-linear-to-br from-violet-50 via-white to-indigo-50 rounded-2xl p-6 border-2 border-violet-200 shadow-sm hover:shadow-md transition-shadow">
                 <h3 className="text-lg font-bold mb-5 text-violet-700 flex items-center gap-2 border-b-2 border-violet-100 pb-3">
-                  <span className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
-                    🏠
+                  <span className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center text-violet-600">
+                    <i className="fa-solid fa-house"></i>
                   </span>
                   Phòng theo thời gian
                 </h3>
@@ -732,7 +778,7 @@ export default function AdminPage() {
                         color: "bg-linear-to-t from-cyan-600 to-cyan-400",
                         bgColor: "bg-cyan-50",
                         borderColor: "border-cyan-200",
-                        icon: "📅",
+                        icon: "fa-calendar-day",
                       },
                       {
                         label: "Tháng này",
@@ -740,7 +786,7 @@ export default function AdminPage() {
                         color: "bg-linear-to-t from-violet-600 to-violet-400",
                         bgColor: "bg-violet-50",
                         borderColor: "border-violet-200",
-                        icon: "📆",
+                        icon: "fa-calendar-week",
                       },
                       {
                         label: "Năm nay",
@@ -748,7 +794,7 @@ export default function AdminPage() {
                         color: "bg-linear-to-t from-fuchsia-600 to-fuchsia-400",
                         bgColor: "bg-fuchsia-50",
                         borderColor: "border-fuchsia-200",
-                        icon: "🗓️",
+                        icon: "fa-calendar",
                       },
                       {
                         label: "Tổng cộng",
@@ -756,7 +802,7 @@ export default function AdminPage() {
                         color: "bg-linear-to-t from-indigo-600 to-indigo-400",
                         bgColor: "bg-indigo-50",
                         borderColor: "border-indigo-200",
-                        icon: "📊",
+                        icon: "fa-chart-simple",
                       },
                     ];
 
@@ -783,7 +829,9 @@ export default function AdminPage() {
                             <div
                               className={`mb-3 px-3 py-1.5 ${item.bgColor} rounded-lg shadow-sm border ${item.borderColor} group-hover:scale-110 transition-all duration-200 flex items-center gap-1`}
                             >
-                              <span className="text-sm">{item.icon}</span>
+                              <i
+                                className={`fa-solid ${item.icon} text-sm`}
+                              ></i>
                               <span className="text-lg font-black text-gray-800">
                                 {item.count}
                               </span>
@@ -1439,414 +1487,410 @@ export default function AdminPage() {
           <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 md:mb-4 text-teal-600">
             Quản lý Đăng ký theo Phòng
           </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Tổng hợp tất cả các phòng đang mở hoặc đang chơi (bao gồm cả tạo tự
+            động và tạo tay).
+          </p>
 
-          {roomsByNews.length === 0 && (
-            <div className="text-center py-8 text-gray-500 text-sm">
-              Chưa có bài đăng "Tạo phòng" nào
-            </div>
-          )}
+          {/* Filter tabs */}
+          {(() => {
+            // Gather all rooms from news
+            const allNewsRooms = roomsByNews.flatMap((nr: any) =>
+              nr.rooms.map((r: any) => ({
+                ...r,
+                newsTitle: nr.newsTitle,
+                newsId: nr.newsId,
+              }))
+            );
+            const newsRoomIds = allNewsRooms.map((r: any) => r._id);
 
-          {roomsByNews.map((newsData: any) => (
-            <div
-              key={newsData.newsId}
-              className="mb-4 sm:mb-6 border-2 border-teal-200 rounded-xl p-3 sm:p-4 bg-teal-50"
-            >
-              {/* Header with buttons */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-teal-800 line-clamp-2">
-                  {newsData.newsTitle}
-                </h3>
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => loadRegistrationList(newsData.newsId)}
-                    className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold whitespace-nowrap"
-                  >
-                    📋 Xem DS
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedNewsId(newsData.newsId);
-                      setShowAutoCreateModal(true);
-                    }}
-                    className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-semibold whitespace-nowrap"
-                  >
-                    ⚙️ Tạo tự động
-                  </button>
+            // Manual rooms (not linked to news)
+            const manualRooms = customs.filter(
+              (c: any) => !newsRoomIds.includes(c._id)
+            );
+
+            // Combine all rooms
+            const allRooms = [...allNewsRooms, ...manualRooms];
+
+            // Filter active rooms (open or ongoing)
+            const activeRooms = allRooms.filter(
+              (r: any) => r.status === "open" || r.status === "ongoing"
+            );
+
+            // Stats
+            const openCount = allRooms.filter(
+              (r: any) => r.status === "open"
+            ).length;
+            const ongoingCount = allRooms.filter(
+              (r: any) => r.status === "ongoing"
+            ).length;
+            const closedCount = allRooms.filter(
+              (r: any) => r.status === "closed"
+            ).length;
+
+            return (
+              <>
+                {/* Stats summary */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-green-600">
+                      {openCount}
+                    </p>
+                    <p className="text-xs text-green-700 font-medium">
+                      Đang mở
+                    </p>
+                  </div>
+                  <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {ongoingCount}
+                    </p>
+                    <p className="text-xs text-yellow-700 font-medium">
+                      Đang chơi
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-gray-600">
+                      {closedCount}
+                    </p>
+                    <p className="text-xs text-gray-700 font-medium">Đã đóng</p>
+                  </div>
                 </div>
-              </div>
 
-              {newsData.rooms.length === 0 ? (
-                <p className="text-gray-600 text-xs sm:text-sm">
-                  Chưa có phòng nào
-                </p>
-              ) : (
-                <div className="space-y-2 sm:space-y-3">
-                  {newsData.rooms.map((room: any) => (
-                    <div
-                      key={room._id}
-                      className="bg-white rounded-lg border-2 border-gray-200 p-2 sm:p-3"
-                    >
-                      {/* Room header */}
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                        <h4 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-1">
-                          {room.title || `Phòng ${room.roomNumber}`}
-                        </h4>
-                        <div className="flex items-center justify-between sm:justify-end gap-2">
-                          <div className="flex items-center gap-2">
+                {activeRooms.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 text-sm">
+                    Không có phòng nào đang mở hoặc đang chơi.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activeRooms.map((room: any) => (
+                      <div
+                        key={room._id}
+                        className="bg-gray-50 rounded-lg border-2 border-gray-200 p-3 hover:bg-gray-100 transition"
+                      >
+                        {/* Room header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 text-sm sm:text-base">
+                              {room.title || `Phòng ${room.roomNumber}`}
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              {room.newsTitle ? (
+                                <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                  <i className="fa-solid fa-newspaper"></i>{" "}
+                                  {room.newsTitle}
+                                </span>
+                              ) : (
+                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                  <i className="fa-solid fa-gamepad"></i> Tạo
+                                  tay
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-500 inline-flex items-center gap-1">
+                                <i className="fa-regular fa-clock"></i>{" "}
+                                {new Date(room.scheduleTime).toLocaleString(
+                                  "vi-VN"
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
                             <Link
                               to={`/customs/${room._id}`}
-                              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium flex items-center gap-1"
-                              title="Xem chi tiết phòng"
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium inline-flex items-center gap-1"
                             >
-                              👁️ <span className="hidden sm:inline">Xem</span>
+                              <i className="fa-solid fa-eye"></i> Xem
                             </Link>
                             <button
                               onClick={() =>
-                                deleteCustomRoom(newsData.newsId, room._id)
+                                room.newsId
+                                  ? deleteCustomRoom(room.newsId, room._id)
+                                  : requestDeleteCustom(room._id)
                               }
-                              className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium"
-                              title="Xóa phòng"
+                              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium inline-flex items-center gap-1"
                             >
-                              🗑️ <span className="hidden sm:inline">Xóa</span>
+                              <i className="fa-solid fa-trash"></i> Xóa
+                            </button>
+                            <span
+                              className={`w-20 text-center px-2 py-1 rounded text-xs font-bold ${
+                                room.status === "open"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-yellow-100 text-yellow-700"
+                              }`}
+                            >
+                              {room.status === "open" ? "Mở" : "Đang chơi"}
+                            </span>
+                            <span
+                              className={`w-12 text-center px-2 py-1 rounded text-xs font-bold ${
+                                room.players?.length >= 10
+                                  ? "bg-red-100 text-red-600"
+                                  : "bg-green-100 text-green-600"
+                              }`}
+                            >
+                              {room.players?.length || 0}/10
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Teams */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {room.team1 && room.team1.length > 0 && (
+                            <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                              <div className="font-semibold text-blue-700 text-xs mb-1">
+                                Đội 1 ({room.team1.length}/5)
+                              </div>
+                              <div className="space-y-0.5">
+                                {room.team1.map((player: any) => (
+                                  <div
+                                    key={player._id}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <img
+                                      src={
+                                        player.avatarUrl ||
+                                        "https://placehold.co/24x24"
+                                      }
+                                      alt=""
+                                      className="w-5 h-5 rounded-full shrink-0"
+                                    />
+                                    <span className="text-xs text-gray-700 truncate">
+                                      {player.ingameName || player.username}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {room.team2 && room.team2.length > 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded p-2">
+                              <div className="font-semibold text-red-700 text-xs mb-1">
+                                Đội 2 ({room.team2.length}/5)
+                              </div>
+                              <div className="space-y-0.5">
+                                {room.team2.map((player: any) => (
+                                  <div
+                                    key={player._id}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <img
+                                      src={
+                                        player.avatarUrl ||
+                                        "https://placehold.co/24x24"
+                                      }
+                                      alt=""
+                                      className="w-5 h-5 rounded-full shrink-0"
+                                    />
+                                    <span className="text-xs text-gray-700 truncate">
+                                      {player.ingameName || player.username}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* News-based room creation section */}
+                {roomsByNews.length > 0 && (
+                  <div className="mt-6 border-2 border-teal-200 rounded-xl p-3 sm:p-4 bg-teal-50">
+                    <h3 className="text-base sm:text-lg font-bold text-teal-700 mb-3 flex items-center gap-2">
+                      <i className="fa-solid fa-cog"></i> Tạo phòng từ bài đăng
+                    </h3>
+                    <div className="space-y-2">
+                      {roomsByNews.map((newsData: any) => (
+                        <div
+                          key={newsData.newsId}
+                          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white rounded-lg p-3 border border-teal-200"
+                        >
+                          <span className="text-sm font-medium text-gray-800 line-clamp-1">
+                            {newsData.newsTitle}
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() =>
+                                loadRegistrationList(newsData.newsId)
+                              }
+                              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1"
+                            >
+                              <i className="fa-solid fa-clipboard-list"></i> Xem
+                              DS
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedNewsId(newsData.newsId);
+                                setShowAutoCreateModal(true);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold inline-flex items-center gap-1"
+                            >
+                              <i className="fa-solid fa-cog"></i> Tạo tự động
                             </button>
                           </div>
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-bold whitespace-nowrap ${
-                              room.status === "full" ||
-                              room.players?.length >= 10
-                                ? "bg-red-100 text-red-600"
-                                : "bg-green-100 text-green-600"
-                            }`}
-                          >
-                            {room.players?.length || 0}/10
-                          </span>
                         </div>
-                      </div>
-
-                      {/* Teams */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {/* Team 1 */}
-                        {room.team1 && room.team1.length > 0 && (
-                          <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                            <div className="font-semibold text-blue-700 text-xs mb-1">
-                              Đội 1 ({room.team1.length})
-                            </div>
-                            <div className="space-y-0.5">
-                              {room.team1.map((player: any) => (
-                                <div
-                                  key={player._id}
-                                  className="flex items-center gap-2"
-                                >
-                                  <img
-                                    src={
-                                      player.avatarUrl ||
-                                      "https://placehold.co/24x24"
-                                    }
-                                    alt=""
-                                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full shrink-0"
-                                  />
-                                  <span className="text-xs text-gray-700 truncate">
-                                    {player.ingameName || player.username}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {/* Team 2 */}
-                        {room.team2 && room.team2.length > 0 && (
-                          <div className="bg-red-50 border border-red-200 rounded p-2">
-                            <div className="font-semibold text-red-700 text-xs mb-1">
-                              Đội 2 ({room.team2.length})
-                            </div>
-                            <div className="space-y-0.5">
-                              {room.team2.map((player: any) => (
-                                <div
-                                  key={player._id}
-                                  className="flex items-center gap-2"
-                                >
-                                  <img
-                                    src={
-                                      player.avatarUrl ||
-                                      "https://placehold.co/24x24"
-                                    }
-                                    alt=""
-                                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full shrink-0"
-                                  />
-                                  <span className="text-xs text-gray-700 truncate">
-                                    {player.ingameName || player.username}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Section 2: Manual Rooms (customs not linked to news) */}
-          <div className="mt-6 border-2 border-purple-200 rounded-xl p-3 sm:p-4 bg-purple-50">
-            <h3 className="text-base sm:text-lg font-bold text-purple-700 mb-3 flex items-center gap-2">
-              🎮 Phòng tạo bằng tay (Custom Games)
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Các phòng được tạo thủ công từ trang Custom Games, không liên kết
-              với bài đăng.
-            </p>
-            {(() => {
-              const newsRoomIds = roomsByNews.flatMap((nr: any) =>
-                nr.rooms.map((r: any) => r._id)
-              );
-              const manualRooms = customs.filter(
-                (c: any) => !newsRoomIds.includes(c._id)
-              );
-
-              if (manualRooms.length === 0) {
-                return (
-                  <p className="text-gray-500 text-sm">
-                    Chưa có phòng nào được tạo bằng tay.
-                  </p>
-                );
-              }
-
-              return (
-                <div className="space-y-3">
-                  {manualRooms.map((room: any) => (
-                    <div
-                      key={room._id}
-                      className="bg-white rounded-lg border-2 border-gray-200 p-3"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                        <div>
-                          <h4 className="font-semibold text-gray-900">
-                            {room.title}
-                          </h4>
-                          <p className="text-xs text-gray-600">
-                            🕒{" "}
-                            {new Date(room.scheduleTime).toLocaleString(
-                              "vi-VN"
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Link
-                            to={`/customs/${room._id}`}
-                            className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium"
-                          >
-                            👁️ Xem
-                          </Link>
-                          <button
-                            onClick={() => requestDeleteCustom(room._id)}
-                            className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium"
-                          >
-                            🗑️ Xóa
-                          </button>
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-bold ${
-                              room.status === "open"
-                                ? "bg-green-100 text-green-700"
-                                : room.status === "ongoing"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-gray-100 text-gray-700"
-                            }`}
-                          >
-                            {room.status === "open"
-                              ? "Mở"
-                              : room.status === "ongoing"
-                              ? "Đang chơi"
-                              : "Đóng"}
-                          </span>
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-bold ${
-                              room.players?.length >= 10
-                                ? "bg-red-100 text-red-600"
-                                : "bg-green-100 text-green-600"
-                            }`}
-                          >
-                            {room.players?.length || 0}/10
-                          </span>
-                        </div>
-                      </div>
-                      {/* Teams display */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                        {room.team1 && room.team1.length > 0 && (
-                          <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                            <div className="font-semibold text-blue-700 text-xs mb-1">
-                              Đội 1 ({room.team1.length}/5)
-                            </div>
-                            <div className="space-y-0.5">
-                              {room.team1.map((player: any) => (
-                                <div
-                                  key={player._id}
-                                  className="flex items-center gap-2"
-                                >
-                                  <img
-                                    src={
-                                      player.avatarUrl ||
-                                      "https://placehold.co/24x24"
-                                    }
-                                    alt=""
-                                    className="w-5 h-5 rounded-full shrink-0"
-                                  />
-                                  <span className="text-xs text-gray-700 truncate">
-                                    {player.ingameName || player.username}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {room.team2 && room.team2.length > 0 && (
-                          <div className="bg-red-50 border border-red-200 rounded p-2">
-                            <div className="font-semibold text-red-700 text-xs mb-1">
-                              Đội 2 ({room.team2.length}/5)
-                            </div>
-                            <div className="space-y-0.5">
-                              {room.team2.map((player: any) => (
-                                <div
-                                  key={player._id}
-                                  className="flex items-center gap-2"
-                                >
-                                  <img
-                                    src={
-                                      player.avatarUrl ||
-                                      "https://placehold.co/24x24"
-                                    }
-                                    alt=""
-                                    className="w-5 h-5 rounded-full shrink-0"
-                                  />
-                                  <span className="text-xs text-gray-700 truncate">
-                                    {player.ingameName || player.username}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
       {activeTab === "matches" && (
         <div className="bg-white rounded-xl border-2 border-gray-200 p-3 sm:p-4 md:p-6 shadow-md">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 md:mb-4 text-indigo-700">
-            📋 Danh Sách Đấu
+          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 md:mb-4 text-indigo-700 flex items-center gap-2">
+            <i className="fa-solid fa-clipboard-list"></i> Danh Sách Đấu
           </h2>
           <p className="text-sm text-gray-600 mb-4">
-            Tổng hợp tất cả các phòng đấu. Ấn "Coi" để xem danh sách thành viên.
+            Tổng hợp tất cả các phòng đấu (bao gồm cả tạo tự động và tạo tay).
+            Ấn "Coi" để xem danh sách thành viên.
           </p>
 
           {/* All rooms list */}
           {(() => {
-            const newsRoomIds = roomsByNews.flatMap((nr: any) =>
-              nr.rooms.map((r: any) => r._id)
-            );
-            const manualRooms = customs.filter(
-              (c: any) => !newsRoomIds.includes(c._id)
-            );
+            // Gather all rooms from news
             const allNewsRooms = roomsByNews.flatMap((nr: any) =>
               nr.rooms.map((r: any) => ({ ...r, newsTitle: nr.newsTitle }))
             );
+            const newsRoomIds = allNewsRooms.map((r: any) => r._id);
+
+            // Manual rooms (not linked to news)
+            const manualRooms = customs.filter(
+              (c: any) => !newsRoomIds.includes(c._id)
+            );
+
+            // Combine all rooms
             const allRooms = [...allNewsRooms, ...manualRooms];
 
-            if (allRooms.length === 0) {
-              return (
-                <div className="text-center py-8 text-gray-500 text-sm">
-                  Chưa có phòng đấu nào.
-                </div>
-              );
-            }
+            // Filter active rooms (open or ongoing)
+            const activeRooms = allRooms.filter(
+              (r: any) => r.status === "open" || r.status === "ongoing"
+            );
+
+            // Stats
+            const openCount = allRooms.filter(
+              (r: any) => r.status === "open"
+            ).length;
+            const ongoingCount = allRooms.filter(
+              (r: any) => r.status === "ongoing"
+            ).length;
+            const closedCount = allRooms.filter(
+              (r: any) => r.status === "closed"
+            ).length;
 
             return (
-              <div className="space-y-3">
-                {allRooms.map((room: any) => (
-                  <div
-                    key={room._id}
-                    className="bg-gray-50 rounded-lg border-2 border-gray-200 p-3 hover:bg-gray-100 transition"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">
-                          {room.title}
-                        </h4>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          {room.newsTitle && (
-                            <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
-                              📰 {room.newsTitle}
+              <>
+                {/* Stats summary */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-green-600">
+                      {openCount}
+                    </p>
+                    <p className="text-xs text-green-700 font-medium">
+                      Đang mở
+                    </p>
+                  </div>
+                  <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {ongoingCount}
+                    </p>
+                    <p className="text-xs text-yellow-700 font-medium">
+                      Đang chơi
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-gray-600">
+                      {closedCount}
+                    </p>
+                    <p className="text-xs text-gray-700 font-medium">Đã đóng</p>
+                  </div>
+                </div>
+
+                {activeRooms.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 text-sm">
+                    Không có phòng đấu nào đang mở hoặc đang chơi.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activeRooms.map((room: any) => (
+                      <div
+                        key={room._id}
+                        className="bg-gray-50 rounded-lg border-2 border-gray-200 p-3 hover:bg-gray-100 transition"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900">
+                              {room.title}
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              {room.newsTitle ? (
+                                <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                  <i className="fa-solid fa-newspaper"></i>{" "}
+                                  {room.newsTitle}
+                                </span>
+                              ) : (
+                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                  <i className="fa-solid fa-gamepad"></i> Tạo
+                                  tay
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-500 inline-flex items-center gap-1">
+                                <i className="fa-regular fa-clock"></i>{" "}
+                                {new Date(room.scheduleTime).toLocaleString(
+                                  "vi-VN"
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => {
+                                setSelectedRoomForParticipants(room);
+                                setShowRoomParticipantsModal(true);
+                              }}
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1"
+                            >
+                              <i className="fa-solid fa-eye"></i> Coi
+                            </button>
+                            <span
+                              className={`w-20 text-center px-2 py-1 rounded text-xs font-bold ${
+                                room.status === "open"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-yellow-100 text-yellow-700"
+                              }`}
+                            >
+                              {room.status === "open" ? "Mở" : "Đang chơi"}
                             </span>
-                          )}
-                          {!room.newsTitle && (
-                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
-                              🎮 Tạo tay
+                            <span
+                              className={`w-12 text-center px-2 py-1 rounded text-xs font-bold ${
+                                room.players?.length >= 10
+                                  ? "bg-red-100 text-red-600"
+                                  : "bg-green-100 text-green-600"
+                              }`}
+                            >
+                              {room.players?.length || 0}/10
                             </span>
-                          )}
-                          <span className="text-xs text-gray-500">
-                            🕒{" "}
-                            {new Date(room.scheduleTime).toLocaleString(
-                              "vi-VN"
-                            )}
-                          </span>
+                          </div>
+                        </div>
+                        {/* Teams summary */}
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <div className="text-xs text-blue-700 flex items-center gap-1">
+                            <i className="fa-solid fa-circle text-blue-500"></i>{" "}
+                            Đội 1: {room.team1?.length || 0}/5
+                          </div>
+                          <div className="text-xs text-red-700 flex items-center gap-1">
+                            <i className="fa-solid fa-circle text-red-500"></i>{" "}
+                            Đội 2: {room.team2?.length || 0}/5
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedRoomForParticipants(room);
-                            setShowRoomParticipantsModal(true);
-                          }}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold"
-                        >
-                          👁️ Coi
-                        </button>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-bold ${
-                            room.status === "open"
-                              ? "bg-green-100 text-green-700"
-                              : room.status === "ongoing"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-gray-100 text-gray-700"
-                          }`}
-                        >
-                          {room.status === "open"
-                            ? "Mở"
-                            : room.status === "ongoing"
-                            ? "Đang chơi"
-                            : "Đóng"}
-                        </span>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-bold ${
-                            room.players?.length >= 10
-                              ? "bg-red-100 text-red-600"
-                              : "bg-green-100 text-green-600"
-                          }`}
-                        >
-                          {room.players?.length || 0}/10
-                        </span>
-                      </div>
-                    </div>
-                    {/* Teams summary */}
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      <div className="text-xs text-blue-700">
-                        🔵 Đội 1: {room.team1?.length || 0}/5
-                      </div>
-                      <div className="text-xs text-red-700">
-                        🔴 Đội 2: {room.team2?.length || 0}/5
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             );
           })()}
         </div>
@@ -1874,10 +1918,10 @@ export default function AdminPage() {
                   }
                   className="w-full p-3 text-sm bg-gray-50 rounded-lg border-2 border-gray-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
                 >
-                  <option value="5vs5">🗺️ 5vs5 - Summoner's Rift</option>
-                  <option value="aram">🌉 ARAM - Howling Abyss</option>
-                  <option value="draft">🏆 Giải đấu cấm chọn</option>
-                  <option value="minigame">🎮 Minigame</option>
+                  <option value="5vs5">5vs5 - Summoner's Rift</option>
+                  <option value="aram">ARAM - Howling Abyss</option>
+                  <option value="draft">Giải đấu cấm chọn</option>
+                  <option value="minigame">Minigame</option>
                 </select>
               </div>
               <div>
@@ -1927,8 +1971,9 @@ export default function AdminPage() {
       {showDeleteCustomModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold text-red-600 mb-4">
-              ⚠️ Xác nhận xóa Custom
+            <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-triangle-exclamation"></i> Xác nhận xóa
+              Custom
             </h3>
             <p className="text-gray-700 mb-6">
               Bạn có chắc muốn xóa custom game này? Hành động này không thể hoàn
@@ -1959,8 +2004,8 @@ export default function AdminPage() {
       {showViewReportModal && reportToView && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-lg w-full">
-            <h3 className="text-xl font-bold text-orange-600 mb-4">
-              📋 Chi tiết báo cáo
+            <h3 className="text-xl font-bold text-orange-600 mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-clipboard"></i> Chi tiết báo cáo
             </h3>
             <div className="space-y-3 mb-6">
               <div>
@@ -2009,8 +2054,9 @@ export default function AdminPage() {
       {showDeleteReportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold text-red-600 mb-4">
-              ⚠️ Xác nhận xóa báo cáo
+            <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-triangle-exclamation"></i> Xác nhận xóa
+              báo cáo
             </h3>
             <p className="text-gray-700 mb-6">
               Bạn có chắc muốn xóa báo cáo này? Hành động này không thể hoàn
@@ -2042,16 +2088,16 @@ export default function AdminPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-teal-800">
-                📋 Danh sách đăng ký
+              <h3 className="text-xl font-bold text-teal-800 flex items-center gap-2">
+                <i className="fa-solid fa-clipboard-list"></i> Danh sách đăng ký
               </h3>
               <button
                 onClick={() => {
                   setShowAddMemberModal(true);
                 }}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm"
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm inline-flex items-center gap-1"
               >
-                ➕ Thêm thành viên
+                <i className="fa-solid fa-plus"></i> Thêm thành viên
               </button>
             </div>
 
@@ -2140,8 +2186,9 @@ export default function AdminPage() {
       {showAddMemberModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-60 p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-bold text-green-600 mb-4">
-              ➕ Thêm thành viên vào danh sách
+            <h3 className="text-xl font-bold text-green-600 mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-user-plus"></i> Thêm thành viên vào danh
+              sách
             </h3>
             <p className="text-sm text-gray-600 mb-4">
               Chọn nhiều thành viên để thêm vào danh sách đăng ký (có thể chọn
@@ -2214,7 +2261,9 @@ export default function AdminPage() {
                       </div>
                     </div>
                     {selectedMembersToAdd.includes(member._id) && (
-                      <span className="text-green-600 font-bold">✓</span>
+                      <span className="text-green-600 font-bold">
+                        <i className="fa-solid fa-check"></i>
+                      </span>
                     )}
                   </button>
                 ))}
@@ -2247,8 +2296,9 @@ export default function AdminPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-indigo-700">
-                📋 Danh sách thành viên
+              <h3 className="text-xl font-bold text-indigo-700 flex items-center gap-2">
+                <i className="fa-solid fa-clipboard-list"></i> Danh sách thành
+                viên
               </h3>
               <button
                 onClick={() => {
@@ -2268,17 +2318,18 @@ export default function AdminPage() {
               </h4>
               <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
                 {selectedRoomForParticipants.newsTitle && (
-                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
-                    📰 {selectedRoomForParticipants.newsTitle}
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                    <i className="fa-solid fa-newspaper"></i>{" "}
+                    {selectedRoomForParticipants.newsTitle}
                   </span>
                 )}
                 {!selectedRoomForParticipants.newsTitle && (
-                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
-                    🎮 Tạo tay
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                    <i className="fa-solid fa-gamepad"></i> Tạo tay
                   </span>
                 )}
-                <span className="text-xs text-gray-500">
-                  🕒{" "}
+                <span className="text-xs text-gray-500 inline-flex items-center gap-1">
+                  <i className="fa-regular fa-clock"></i>{" "}
                   {new Date(
                     selectedRoomForParticipants.scheduleTime
                   ).toLocaleString("vi-VN")}
@@ -2306,7 +2357,7 @@ export default function AdminPage() {
               {/* Team 1 */}
               <div className="bg-blue-50 rounded-lg border-2 border-blue-200 p-4">
                 <h5 className="font-bold text-blue-700 mb-3 flex items-center gap-2 text-lg">
-                  🔵 Đội 1{" "}
+                  <i className="fa-solid fa-circle text-blue-500"></i> Đội 1{" "}
                   <span className="text-sm font-normal">
                     ({selectedRoomForParticipants.team1?.length || 0}/5)
                   </span>
@@ -2352,7 +2403,7 @@ export default function AdminPage() {
               {/* Team 2 */}
               <div className="bg-red-50 rounded-lg border-2 border-red-200 p-4">
                 <h5 className="font-bold text-red-700 mb-3 flex items-center gap-2 text-lg">
-                  🔴 Đội 2{" "}
+                  <i className="fa-solid fa-circle text-red-500"></i> Đội 2{" "}
                   <span className="text-sm font-normal">
                     ({selectedRoomForParticipants.team2?.length || 0}/5)
                   </span>
@@ -2400,9 +2451,9 @@ export default function AdminPage() {
             <div className="mt-6 flex gap-3">
               <Link
                 to={`/customs/${selectedRoomForParticipants._id}`}
-                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-center transition"
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-center transition inline-flex items-center justify-center gap-2"
               >
-                👁️ Xem chi tiết phòng
+                <i className="fa-solid fa-eye"></i> Xem chi tiết phòng
               </Link>
               <button
                 onClick={() => {

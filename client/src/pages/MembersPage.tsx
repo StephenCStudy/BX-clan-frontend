@@ -180,10 +180,12 @@ export default function MembersPage() {
   const pageItems = sorted.slice(start, start + PAGE_SIZE);
 
   return (
-    <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 animate-fade-in gpu-accelerated">
+    <div className="mx-auto w-full max-w-7xl px-4 py-4 md:px-6 md:py-6 lg:px-8 animate-fade-in gpu-accelerated">
       <div className="flex flex-row items-center justify-between gap-2 mb-6 animate-fade-in-down">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-red-600 flex items-center gap-2">
-          <span className="animate-pulse">👥</span>
+          <span className="animate-pulse">
+            <i className="fa-solid fa-users"></i>
+          </span>
           Thành viên Clan ({members.length})
         </h1>
         {(user?.role === "leader" || user?.role === "organizer") && (

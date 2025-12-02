@@ -15,7 +15,9 @@ export default function NotFoundPage() {
             <div className="w-40 h-40 bg-red-600 rounded-full opacity-10 animate-ping"></div>
           </div>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-8xl animate-bounce">🎮</span>
+            <span className="text-8xl animate-bounce text-red-500">
+              <i className="fa-solid fa-gamepad"></i>
+            </span>
           </div>
         </div>
 
@@ -47,7 +49,7 @@ export default function NotFoundPage() {
             className="group flex items-center gap-2 px-8 py-3 bg-linear-to-r from-red-700 to-red-600 text-white rounded-lg font-semibold hover:from-red-600 hover:to-red-500 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-red-600/50"
           >
             <span className="text-xl transition-transform duration-300 group-hover:scale-110">
-              🏠
+              <i className="fa-solid fa-house"></i>
             </span>
             Về trang chủ
           </Link>
@@ -71,33 +73,33 @@ export default function NotFoundPage() {
 
         {/* Popular Links */}
         <div className="mt-12 p-6 bg-[#1a1a22] rounded-xl border border-red-900/20 shadow-xl">
-          <h3 className="text-xl font-bold text-red-500 mb-6">
-            🔥 Các trang phổ biến
+          <h3 className="text-xl font-bold text-red-500 mb-6 flex items-center gap-2 justify-center">
+            <i className="fa-solid fa-fire"></i> Các trang phổ biến
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <Link
               to="/members"
-              className="text-left px-4 py-3 rounded-lg bg-[#111118] hover:bg-red-900/30 hover:text-red-400 text-gray-300 transition-all duration-300 hover:scale-105 hover:shadow-md"
+              className="text-left px-4 py-3 rounded-lg bg-[#111118] hover:bg-red-900/30 hover:text-red-400 text-gray-300 transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
             >
-              👥 Thành viên
+              <i className="fa-solid fa-users"></i> Thành viên
             </Link>
             <Link
               to="/customs"
-              className="text-left px-4 py-3 rounded-lg bg-[#111118] hover:bg-red-900/30 hover:text-red-400 text-gray-300 transition-all duration-300 hover:scale-105 hover:shadow-md"
+              className="text-left px-4 py-3 rounded-lg bg-[#111118] hover:bg-red-900/30 hover:text-red-400 text-gray-300 transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
             >
-              🎮 Custom Game
+              <i className="fa-solid fa-gamepad"></i> Custom Game
             </Link>
             <Link
               to="/news"
-              className="text-left px-4 py-3 rounded-lg bg-[#111118] hover:bg-red-900/30 hover:text-red-400 text-gray-300 transition-all duration-300 hover:scale-105 hover:shadow-md"
+              className="text-left px-4 py-3 rounded-lg bg-[#111118] hover:bg-red-900/30 hover:text-red-400 text-gray-300 transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
             >
-              📰 Tin tức
+              <i className="fa-solid fa-newspaper"></i> Tin tức
             </Link>
             <Link
               to="/chat"
-              className="text-left px-4 py-3 rounded-lg bg-[#111118] hover:bg-red-900/30 hover:text-red-400 text-gray-300 transition-all duration-300 hover:scale-105 hover:shadow-md"
+              className="text-left px-4 py-3 rounded-lg bg-[#111118] hover:bg-red-900/30 hover:text-red-400 text-gray-300 transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
             >
-              💬 Chat
+              <i className="fa-solid fa-comments"></i> Chat
             </Link>
           </div>
         </div>

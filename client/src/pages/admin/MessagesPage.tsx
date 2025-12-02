@@ -3,7 +3,8 @@ import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { http } from "../../utils/http";
 import { toast } from "react-toastify";
-import { io, Socket } from "socket.io-client";
+import { Socket } from "socket.io-client";
+import { createSocket } from "../../utils/socket";
 import BackButton from "../../components/BackButton";
 
 interface Conversation {
@@ -54,8 +55,6 @@ export default function MessagesPage() {
   const selectedUserRef = useRef<string | null>(null);
   const prevMessagesLengthRef = useRef<number>(0);
   const isInitialLoadRef = useRef<boolean>(true);
-
-  const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
   useEffect(() => {
     selectedUserRef.current = selectedUserId;
@@ -160,7 +159,7 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!user) return;
 
-    const s = io(SOCKET_URL);
+    const s = createSocket();
     s.emit("user:join", user.id);
 
     const appendIfActive = (msg: Message) => {
@@ -185,7 +184,7 @@ export default function MessagesPage() {
       s.off("private:sent", appendIfActive);
       s.disconnect();
     };
-  }, [SOCKET_URL, user, loadConversations]);
+  }, [user, loadConversations]);
 
   const sendMessage = async () => {
     if (!text.trim() || !selectedUserId || !user) return;
@@ -228,7 +227,10 @@ export default function MessagesPage() {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden mt-4">
           <div className="bg-linear-to-r from-red-600 to-orange-600 p-6">
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
-              <span>💬</span> Tin nhắn
+              <span>
+                <i className="fa-solid fa-comments"></i>
+              </span>{" "}
+              Tin nhắn
             </h1>
             <p className="text-white/90 mt-2">Quản lý tin nhắn từ thành viên</p>
           </div>
@@ -246,9 +248,9 @@ export default function MessagesPage() {
                   </h2>
                   <button
                     onClick={() => setShowNewMessageModal(true)}
-                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition"
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition inline-flex items-center gap-1"
                   >
-                    ✉️ Gửi tin nhắn
+                    <i className="fa-solid fa-envelope"></i> Gửi tin nhắn
                   </button>
                 </div>
                 {conversationsLoading ? (
@@ -257,7 +259,9 @@ export default function MessagesPage() {
                   </div>
                 ) : conversations.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <div className="text-4xl mb-2">📭</div>
+                    <div className="text-4xl mb-2">
+                      <i className="fa-solid fa-inbox"></i>
+                    </div>
                     <p>Chưa có tin nhắn nào</p>
                   </div>
                 ) : (
@@ -329,9 +333,15 @@ export default function MessagesPage() {
                           {selectedUserInfo.username}
                         </h3>
                         <p className="text-xs text-gray-500">
-                          {selectedUserInfo.role === "member"
-                            ? "👤 Thành viên"
-                            : "👑 Admin"}
+                          {selectedUserInfo.role === "member" ? (
+                            <>
+                              <i className="fa-solid fa-user"></i> Thành viên
+                            </>
+                          ) : (
+                            <>
+                              <i className="fa-solid fa-crown"></i> Admin
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -431,7 +441,9 @@ export default function MessagesPage() {
               ) : (
                 <div className="flex-1 flex items-center justify-center text-gray-500">
                   <div className="text-center">
-                    <div className="text-6xl mb-4">💬</div>
+                    <div className="text-6xl mb-4">
+                      <i className="fa-solid fa-comments"></i>
+                    </div>
                     <p>Chọn một cuộc trò chuyện để bắt đầu</p>
                   </div>
                 </div>
@@ -444,8 +456,8 @@ export default function MessagesPage() {
         {showNewMessageModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-              <h3 className="text-xl font-bold text-red-600 mb-4">
-                ✉️ Gửi tin nhắn mới
+              <h3 className="text-xl font-bold text-red-600 mb-4 inline-flex items-center gap-2">
+                <i className="fa-solid fa-envelope"></i> Gửi tin nhắn mới
               </h3>
               <p className="text-sm text-gray-600 mb-4">
                 Chọn thành viên để bắt đầu cuộc trò chuyện

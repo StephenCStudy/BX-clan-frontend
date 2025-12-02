@@ -129,7 +129,7 @@ export default function RoomMembersPage() {
   );
 
   return (
-    <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
+    <div className="w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
@@ -182,7 +182,7 @@ export default function RoomMembersPage() {
             className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold shadow-md flex items-center gap-2"
             disabled={roomInfo?.status === "full"}
           >
-            ➕ Thêm thành viên
+            <i className="fa-solid fa-plus"></i> Thêm thành viên
           </button>
         </div>
       )}
@@ -244,9 +244,9 @@ export default function RoomMembersPage() {
                 {canManage && (
                   <button
                     onClick={() => setConfirmDelete(reg)}
-                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold"
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold inline-flex items-center gap-1"
                   >
-                    ❌ Xóa
+                    <i className="fa-solid fa-trash"></i> Xóa
                   </button>
                 )}
               </div>

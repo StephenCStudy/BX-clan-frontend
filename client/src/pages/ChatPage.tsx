@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { useEffect, useState, useRef } from "react";
+import { Socket } from "socket.io-client";
 import { http } from "../utils/http";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
+import { createSocket } from "../utils/socket";
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<
@@ -10,9 +11,7 @@ export default function ChatPage() {
   >([]);
   const [text, setText] = useState("");
   const { user } = useAuth();
-  const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
-
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -20,14 +19,14 @@ export default function ChatPage() {
         const res = await http.get("/chat/history");
         setMessages(res.data || []);
       } catch {}
-      const s = io(SOCKET_URL);
+      const s = createSocket();
       s.on("message:receive", (msg: any) => {
         setMessages((prev) => [...prev, msg]);
       });
-      setSocket(s);
+      socketRef.current = s;
     })();
     return () => {
-      socket?.disconnect();
+      socketRef.current?.disconnect();
     };
   }, []);
 
@@ -37,14 +36,16 @@ export default function ChatPage() {
       return;
     }
     if (!text.trim()) return;
-    if (!socket) return;
-    socket.emit("message:send", { userId: user.id, message: text });
+    if (!socketRef.current) return;
+    socketRef.current.emit("message:send", { userId: user.id, message: text });
     setText("");
   };
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 md:px-6 lg:px-8 py-4">
-      <h1 className="text-3xl font-bold text-red-600 mb-4">💬 Clan Chat</h1>
+      <h1 className="text-3xl font-bold text-red-600 mb-4 flex items-center gap-2">
+        <i className="fa-solid fa-comments"></i> Clan Chat
+      </h1>
       <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4">
         <div className="h-96 overflow-y-auto mb-4 space-y-2 bg-gray-50 rounded p-3">
           {messages.map((m, i) => (

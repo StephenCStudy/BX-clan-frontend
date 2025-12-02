@@ -124,28 +124,40 @@ export default function HomePage() {
           <div className="flex flex-wrap justify-center gap-4 mb-12 animate-fade-in-up">
             <Link
               to={user ? "/customs" : "/register"}
-              className="px-6 py-3 rounded-lg bg-white text-red-600 hover:bg-gray-100 text-base md:text-lg font-bold transition-smooth shadow-xl hover:shadow-2xl hover-lift gpu-accelerated animate-pulse"
+              className="px-6 py-3 rounded-lg bg-white text-red-600 hover:bg-gray-100 text-base md:text-lg font-bold transition-smooth shadow-xl hover:shadow-2xl hover-lift gpu-accelerated animate-pulse inline-flex items-center gap-2"
             >
-              {user ? "⚔️ Xem Custom Games" : "🎮 Tham gia ngay"}
+              {user ? (
+                <>
+                  <i className="fa-solid fa-swords"></i> Xem Custom Games
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-gamepad"></i> Tham gia ngay
+                </>
+              )}
             </Link>
             <Link
               to="/members"
-              className="px-6 py-3 rounded-lg bg-black/30 backdrop-blur-sm border-2 border-white/50 hover:bg-black/50 text-white text-base md:text-lg font-bold transition-smooth shadow-xl hover:shadow-2xl hover-lift gpu-accelerated"
+              className="px-6 py-3 rounded-lg bg-black/30 backdrop-blur-sm border-2 border-white/50 hover:bg-black/50 text-white text-base md:text-lg font-bold transition-smooth shadow-xl hover:shadow-2xl hover-lift gpu-accelerated inline-flex items-center gap-2"
             >
-              👥 Thành viên
+              <i className="fa-solid fa-users"></i> Thành viên
             </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
             <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 text-center hover-lift transition-smooth stagger-item gpu-accelerated">
-              <div className="text-3xl mb-2 animate-bounce">⚡</div>
+              <div className="text-3xl mb-2 animate-bounce text-yellow-400">
+                <i className="fa-solid fa-bolt"></i>
+              </div>
               <h3 className="font-bold text-lg mb-1 text-white!">Tốc Độ</h3>
               <p className="text-sm text-white/80">
                 Phản ứng nhanh, hành động quyết đoán
               </p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 text-center hover-lift transition-smooth stagger-item gpu-accelerated">
-              <div className="text-3xl mb-2 animate-pulse">🏆</div>
+              <div className="text-3xl mb-2 animate-pulse text-yellow-400">
+                <i className="fa-solid fa-trophy"></i>
+              </div>
               <h3 className="font-bold text-lg mb-1 text-white!">
                 Chiến Thắng
               </h3>
@@ -154,7 +166,9 @@ export default function HomePage() {
               </p>
             </div>
             <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 text-center hover-lift transition-smooth stagger-item gpu-accelerated">
-              <div className="text-3xl mb-2 animate-swing">🤝</div>
+              <div className="text-3xl mb-2 animate-swing text-yellow-400">
+                <i className="fa-solid fa-handshake"></i>
+              </div>
               <h3 className="font-bold text-lg mb-1 text-white!">Đoàn Kết</h3>
               <p className="text-sm text-white/80">
                 Cùng nhau phát triển và thành công
@@ -164,13 +178,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="w-full max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8 py-12">
+      <div className="mx-auto w-full max-w-7xl px-4 py-12 md:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in-up">
           <div className="bg-linear-to-br from-red-50 to-white rounded-2xl border-2 border-red-200 p-6 shadow-lg hover-lift transition-smooth gpu-accelerated">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-red-600 flex items-center gap-2 animate-fade-in-left">
-                <span className="hover-grow inline-block">📊</span> Tổng Quan
-                Clan
+                <span className="hover-grow inline-block">
+                  <i className="fa-solid fa-chart-bar"></i>
+                </span>{" "}
+                Tổng Quan Clan
               </h2>
             </div>
             <div className="space-y-4">
@@ -236,7 +252,10 @@ export default function HomePage() {
           <div className="bg-linear-to-br from-blue-50 to-white rounded-2xl border-2 border-blue-200 p-6 shadow-lg hover-lift transition-smooth gpu-accelerated">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-blue-600 flex items-center gap-2 animate-fade-in-right">
-                <span className="animate-swing inline-block">📢</span> Thông Báo
+                <span className="animate-swing inline-block">
+                  <i className="fa-solid fa-bullhorn"></i>
+                </span>{" "}
+                Thông Báo
               </h2>
               <Link
                 to="/news"
@@ -259,7 +278,9 @@ export default function HomePage() {
               privateMessages.length === 0 &&
               news.length === 0 ? (
               <div className="text-center py-8 text-gray-500 animate-fade-in">
-                <div className="text-4xl mb-2 animate-swing">📭</div>
+                <div className="text-4xl mb-2 animate-swing">
+                  <i className="fa-solid fa-inbox"></i>
+                </div>
                 <p>Chưa có thông báo nào</p>
                 {!user && (
                   <Link
@@ -274,10 +295,13 @@ export default function HomePage() {
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {notifications.map((notif, idx) => {
                   const getNotificationIcon = () => {
-                    if (notif.type === "custom-invite") return "💌";
-                    if (notif.type === "room-assignment") return "🎮";
-                    if (notif.type === "registration-confirmed") return "✅";
-                    return "📢";
+                    if (notif.type === "custom-invite")
+                      return <i className="fa-solid fa-envelope-open-text"></i>;
+                    if (notif.type === "room-assignment")
+                      return <i className="fa-solid fa-gamepad"></i>;
+                    if (notif.type === "registration-confirmed")
+                      return <i className="fa-solid fa-circle-check"></i>;
+                    return <i className="fa-solid fa-bullhorn"></i>;
                   };
 
                   const getNotificationLink = () => {
@@ -375,8 +399,8 @@ export default function HomePage() {
                     className="block rounded-xl p-3 border-2 border-yellow-300 bg-yellow-50 hover:border-blue-400 hover:shadow-md transition-smooth hover-lift gpu-accelerated stagger-item group"
                   >
                     <div className="flex items-start gap-2">
-                      <span className="text-2xl shrink-0 hover-swing inline-block">
-                        💬
+                      <span className="text-2xl shrink-0 hover-swing inline-block text-blue-500">
+                        <i className="fa-solid fa-comment"></i>
                       </span>
                       {idx === 0 && (
                         <span className="shrink-0 px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-600 border border-red-200 animate-pulse">
@@ -408,8 +432,8 @@ export default function HomePage() {
                     className="block bg-white rounded-xl p-3 border-2 border-gray-200 hover:border-blue-400 hover:shadow-md transition-smooth hover-lift gpu-accelerated stagger-item group"
                   >
                     <div className="flex items-start gap-2">
-                      <span className="text-2xl shrink-0 hover-grow inline-block">
-                        📰
+                      <span className="text-2xl shrink-0 hover-grow inline-block text-purple-500">
+                        <i className="fa-solid fa-newspaper"></i>
                       </span>
                       {idx === 0 && (
                         <span className="shrink-0 px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-600 border border-red-200 animate-pulse">

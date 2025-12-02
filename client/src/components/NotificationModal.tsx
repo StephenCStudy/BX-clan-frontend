@@ -97,7 +97,9 @@ export default function NotificationModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
           {allItems.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              <div className="text-5xl mb-3">📭</div>
+              <div className="text-5xl mb-3">
+                <i className="fa-solid fa-inbox"></i>
+              </div>
               <p>Chưa có thông báo nào</p>
             </div>
           ) : (
@@ -157,15 +159,17 @@ export default function NotificationModal({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-2xl">
-                          {item.itemType === "news"
-                            ? "📰"
-                            : item.type === "room-assignment"
-                            ? "🎮"
-                            : item.type === "custom-invite"
-                            ? "💌"
-                            : item.type === "registration-confirmed"
-                            ? "✅"
-                            : "📢"}
+                          {item.itemType === "news" ? (
+                            <i className="fa-solid fa-newspaper"></i>
+                          ) : item.type === "room-assignment" ? (
+                            <i className="fa-solid fa-gamepad"></i>
+                          ) : item.type === "custom-invite" ? (
+                            <i className="fa-solid fa-envelope"></i>
+                          ) : item.type === "registration-confirmed" ? (
+                            <i className="fa-solid fa-circle-check"></i>
+                          ) : (
+                            <i className="fa-solid fa-bullhorn"></i>
+                          )}
                         </span>
                         <h4 className="font-bold text-gray-900">
                           {item.title}
@@ -200,7 +204,7 @@ export default function NotificationModal({
                             className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
                             title="Đánh dấu đã đọc"
                           >
-                            ✓
+                            <i className="fa-solid fa-check"></i>
                           </button>
                         )}
                         <button
@@ -212,7 +216,7 @@ export default function NotificationModal({
                           className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
                           title="Xóa"
                         >
-                          ✕
+                          <i className="fa-solid fa-xmark"></i>
                         </button>
                       </div>
                     )}

@@ -73,7 +73,7 @@ export default function NewsDetailPage() {
   const isRoomCreation = news.type === "room-creation";
 
   return (
-    <div className="w-full max-w-screen-lg mx-auto px-4 md:px-6 lg:px-8 py-6">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 lg:px-8">
       <div className="mb-4">
         <BackButton />
       </div>
@@ -83,8 +83,8 @@ export default function NewsDetailPage() {
             {news.title}
           </h1>
           {isRoomCreation && (
-            <span className="shrink-0 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600 border border-red-200">
-              🎮 Tạo Phòng
+            <span className="shrink-0 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-600 border border-red-200 inline-flex items-center gap-1">
+              <i className="fa-solid fa-gamepad"></i> Tạo Phòng
             </span>
           )}
         </div>
@@ -101,17 +101,17 @@ export default function NewsDetailPage() {
         <div className="bg-white rounded-xl border-2 border-gray-200 p-6 mb-6 shadow-lg">
           <button
             onClick={() => setShowRegisterModal(true)}
-            className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow transition"
+            className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow transition inline-flex items-center justify-center gap-2"
           >
-            🎮 Đăng ký tham gia
+            <i className="fa-solid fa-gamepad"></i> Đăng ký tham gia
           </button>
         </div>
       )}
 
       {user && isRoomCreation && hasRegistered && (
         <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 mb-6">
-          <p className="text-green-700 font-semibold text-center">
-            ✓ Bạn đã đăng ký tham gia
+          <p className="text-green-700 font-semibold text-center inline-flex items-center justify-center gap-2 w-full">
+            <i className="fa-solid fa-check"></i> Bạn đã đăng ký tham gia
           </p>
         </div>
       )}
