@@ -4,6 +4,8 @@ import { http } from "../utils/http";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import ConfirmModal from "../components/ConfirmModal";
+import TournamentSelectModal from "../components/TournamentSelectModal";
+import TeamSelectModal from "../components/TeamSelectModal";
 import { createSocket } from "../utils/socket";
 import { Socket } from "socket.io-client";
 
@@ -18,6 +20,10 @@ interface CustomRoom {
   players?: Member[];
   team1?: Member[];
   team2?: Member[];
+  isTournamentRoom?: boolean;
+  tournament?: any;
+  tournamentTeam1?: any;
+  tournamentTeam2?: any;
 }
 
 interface Member {
@@ -25,6 +31,31 @@ interface Member {
   username: string;
   ingameName: string;
   avatarUrl?: string;
+}
+
+interface Tournament {
+  _id: string;
+  name: string;
+  description?: string;
+  gameType: string;
+  gameMode: string;
+  defaultBestOf: number;
+  maxTeams: number;
+  teamSize: number;
+  status: string;
+  currentRound: number;
+  registeredTeams: any[];
+  // Optional fields for News-based tournament room creation
+  newsId?: string;
+  newsTitle?: string;
+}
+
+interface Team {
+  _id: string;
+  name: string;
+  tag?: string;
+  logoUrl?: string;
+  members: any[];
 }
 
 export default function CustomsPage() {
@@ -58,6 +89,15 @@ export default function CustomsPage() {
   );
   const [totalPages, setTotalPages] = useState(1);
   const socketRef = useRef<Socket | null>(null);
+
+  // Tournament room creation states
+  const [showTournamentSelect, setShowTournamentSelect] = useState(false);
+  const [showTeamSelect, setShowTeamSelect] = useState(false);
+  const [selectedTournament, setSelectedTournament] =
+    useState<Tournament | null>(null);
+  const [selectedTeam1, setSelectedTeam1] = useState<Team | null>(null);
+  const [selectedTeam2, setSelectedTeam2] = useState<Team | null>(null);
+
   const gameModeOptions = [
     { value: "5vs5", label: "5vs5 - Summoner's Rift" },
     { value: "aram", label: "ARAM - Howling Abyss" },
@@ -140,12 +180,42 @@ export default function CustomsPage() {
   const createCustom = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await http.post("/customs", {
-        ...form,
-        maxPlayers: 10,
-        players: selectedMembers.map((m) => m._id),
-      });
-      toast.success("Tạo Custom thành công");
+      // Nếu tạo phòng từ giải đấu với team đã chọn
+      if (selectedTournament && selectedTeam1 && selectedTeam2) {
+        await http.post("/customs", {
+          ...form,
+          tournamentId: selectedTournament._id,
+          team1Id: selectedTeam1._id,
+          team2Id: selectedTeam2._id,
+          tournamentRound: selectedTournament.currentRound,
+          bestOf: form.bestOf || selectedTournament.defaultBestOf,
+          gameMode: form.gameMode || selectedTournament.gameMode,
+        });
+        toast.success("Tạo phòng giải đấu thành công");
+      } else if (selectedTournament && !selectedTeam1 && !selectedTeam2) {
+        // Tạo phòng giải đấu đơn giản (không có team từ Tournament model)
+        // Dùng cho trường hợp News type="room-creation" mà không link Tournament
+        await http.post("/customs", {
+          ...form,
+          isTournamentRoom: true,
+          newsId: selectedTournament.newsId || selectedTournament._id,
+          tournamentName:
+            selectedTournament.newsTitle || selectedTournament.name,
+          bestOf: form.bestOf || selectedTournament.defaultBestOf || 3,
+          gameMode: form.gameMode || selectedTournament.gameMode || "5vs5",
+        });
+        toast.success("Tạo phòng giải đấu thành công");
+      } else {
+        // Tạo phòng bình thường
+        await http.post("/customs", {
+          ...form,
+          maxPlayers: 10,
+          players: selectedMembers.map((m) => m._id),
+        });
+        toast.success("Tạo Custom thành công");
+      }
+
+      // Reset form
       setShowForm(false);
       setForm({
         title: "",
@@ -156,10 +226,42 @@ export default function CustomsPage() {
         gameMode: "5vs5",
       });
       setSelectedMembers([]);
+      resetTournamentSelection();
       loadCustoms();
     } catch {
       toast.error("Lỗi tạo Custom");
     }
+  };
+
+  // Tournament selection handlers
+  const handleTournamentSelect = (tournament: Tournament) => {
+    setSelectedTournament(tournament);
+    // Cập nhật form với thông tin từ giải đấu
+    setForm((prev) => ({
+      ...prev,
+      bestOf: tournament.defaultBestOf,
+      gameMode: tournament.gameMode,
+    }));
+    // Mở modal chọn team
+    setShowTeamSelect(true);
+  };
+
+  const handleTeamSelect = (team1: Team, team2: Team) => {
+    setSelectedTeam1(team1);
+    setSelectedTeam2(team2);
+    // Tự động tính số người = số thành viên của 2 team
+    const totalPlayers =
+      (team1.members?.length || 0) + (team2.members?.length || 0);
+    setForm((prev) => ({
+      ...prev,
+      maxPlayers: totalPlayers,
+    }));
+  };
+
+  const resetTournamentSelection = () => {
+    setSelectedTournament(null);
+    setSelectedTeam1(null);
+    setSelectedTeam2(null);
   };
 
   const changeStatus = async (id: string, newStatus: string) => {
@@ -265,8 +367,121 @@ export default function CustomsPage() {
             <span className="animate-pulse">
               <i className="fa-solid fa-gamepad"></i>
             </span>
-            Tạo Custom mới
+            {selectedTournament ? "Tạo phòng Giải Đấu" : "Tạo Custom mới"}
           </h2>
+
+          {/* Tournament Selection Section */}
+          <div className="mb-4 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-yellow-800 flex items-center gap-2">
+                <i className="fa-solid fa-trophy"></i>
+                Tạo phòng từ Giải Đấu (tùy chọn)
+              </label>
+              {selectedTournament && (
+                <button
+                  type="button"
+                  onClick={resetTournamentSelection}
+                  className="text-xs text-red-600 hover:text-red-700 font-medium"
+                >
+                  <i className="fa-solid fa-xmark"></i> Hủy chọn
+                </button>
+              )}
+            </div>
+
+            {!selectedTournament ? (
+              <button
+                type="button"
+                onClick={() => setShowTournamentSelect(true)}
+                className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+              >
+                <i className="fa-solid fa-trophy"></i>
+                Chọn Giải Đấu
+              </button>
+            ) : (
+              <div className="space-y-3">
+                {/* Selected Tournament Info */}
+                <div className="p-3 bg-white rounded-lg border border-yellow-300">
+                  <div className="flex items-center gap-2 mb-2">
+                    <i className="fa-solid fa-trophy text-yellow-500"></i>
+                    <span className="font-semibold text-gray-900">
+                      {selectedTournament.name}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                      Vòng {selectedTournament.currentRound}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    BO{selectedTournament.defaultBestOf} •{" "}
+                    {selectedTournament.gameMode}
+                  </p>
+                </div>
+
+                {/* Selected Teams */}
+                {selectedTeam1 && selectedTeam2 ? (
+                  <div className="p-3 bg-white rounded-lg border border-green-300">
+                    <div className="flex items-center justify-between gap-4">
+                      {/* Team 1 */}
+                      <div className="flex-1 text-center p-2 bg-red-50 rounded border border-red-200">
+                        <div className="flex items-center justify-center gap-2">
+                          {selectedTeam1.logoUrl && (
+                            <img
+                              src={selectedTeam1.logoUrl}
+                              alt=""
+                              className="w-8 h-8 rounded-full"
+                            />
+                          )}
+                          <span className="font-semibold text-red-700">
+                            {selectedTeam1.tag || selectedTeam1.name}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {selectedTeam1.members?.length || 0} thành viên
+                        </p>
+                      </div>
+
+                      <span className="font-bold text-gray-400">VS</span>
+
+                      {/* Team 2 */}
+                      <div className="flex-1 text-center p-2 bg-blue-50 rounded border border-blue-200">
+                        <div className="flex items-center justify-center gap-2">
+                          {selectedTeam2.logoUrl && (
+                            <img
+                              src={selectedTeam2.logoUrl}
+                              alt=""
+                              className="w-8 h-8 rounded-full"
+                            />
+                          )}
+                          <span className="font-semibold text-blue-700">
+                            {selectedTeam2.tag || selectedTeam2.name}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {selectedTeam2.members?.length || 0} thành viên
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowTeamSelect(true)}
+                      className="w-full mt-2 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-medium"
+                    >
+                      <i className="fa-solid fa-pen"></i> Đổi team
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowTeamSelect(true)}
+                    className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                  >
+                    <i className="fa-solid fa-users"></i>
+                    Chọn 2 Team Thi Đấu
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="space-y-3">
             <div>
               <label className="block mb-1 text-xs md:text-sm text-gray-700 font-medium">
@@ -358,152 +573,163 @@ export default function CustomsPage() {
               </div>
             </div>
 
-            {/* Player Selection Section */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs md:text-sm text-gray-700 font-medium">
-                  Chọn người chơi ({selectedMembers.length}/10) - có thể thêm
-                  sau
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowMemberSelect(!showMemberSelect)}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium"
-                >
-                  {showMemberSelect ? "Ẩn" : "Chọn"}
-                </button>
+            {/* Player Selection Section - Chỉ hiển thị khi KHÔNG tạo phòng giải đấu */}
+            {!selectedTournament && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs md:text-sm text-gray-700 font-medium">
+                    Chọn người chơi ({selectedMembers.length}/10) - có thể thêm
+                    sau
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowMemberSelect(!showMemberSelect)}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium"
+                  >
+                    {showMemberSelect ? "Ẩn" : "Chọn"}
+                  </button>
+                </div>
+
+                {/* Selected Members Display */}
+                {selectedMembers.length > 0 && (
+                  <div className="mb-3 p-3 bg-gray-50 rounded-lg border-2 border-gray-300 animate-fade-in gpu-accelerated">
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Team 1 */}
+                      <div>
+                        <h3 className="text-xs font-semibold text-blue-600 mb-2">
+                          Đội 1 ({selectedMembers.slice(0, 5).length}/5)
+                        </h3>
+                        <div className="space-y-1">
+                          {selectedMembers.slice(0, 5).map((m) => (
+                            <div
+                              key={m._id}
+                              className="flex items-center gap-2 p-2 bg-white rounded border hover-lift transition-smooth gpu-accelerated"
+                            >
+                              {m.avatarUrl && (
+                                <img
+                                  src={m.avatarUrl}
+                                  alt=""
+                                  className="w-6 h-6 rounded-full hover-grow transition-smooth gpu-accelerated"
+                                />
+                              )}
+                              <span className="text-xs font-medium flex-1">
+                                {m.ingameName || m.username}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => toggleMember(m)}
+                                className="text-red-500 hover:text-red-700 text-xs transition-smooth hover-shrink"
+                              >
+                                <i className="fa-solid fa-xmark"></i>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Team 2 */}
+                      <div>
+                        <h3 className="text-xs font-semibold text-red-600 mb-2">
+                          Đội 2 ({selectedMembers.slice(5, 10).length}/5)
+                        </h3>
+                        <div className="space-y-1">
+                          {selectedMembers.slice(5, 10).map((m) => (
+                            <div
+                              key={m._id}
+                              className="flex items-center gap-2 p-2 bg-white rounded border hover-lift transition-smooth gpu-accelerated"
+                            >
+                              {m.avatarUrl && (
+                                <img
+                                  src={m.avatarUrl}
+                                  alt=""
+                                  className="w-6 h-6 rounded-full hover-grow transition-smooth gpu-accelerated"
+                                />
+                              )}
+                              <span className="text-xs font-medium flex-1">
+                                {m.ingameName || m.username}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => toggleMember(m)}
+                                className="text-red-500 hover:text-red-700 text-xs transition-smooth hover-shrink"
+                              >
+                                <i className="fa-solid fa-xmark"></i>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Member Selection Dropdown */}
+                {showMemberSelect && (
+                  <div className="max-h-60 overflow-y-auto bg-white border-2 border-gray-300 rounded-lg p-2 animate-scale-in gpu-accelerated">
+                    <div className="space-y-1">
+                      {members.map((member) => {
+                        const isSelected = selectedMembers.find(
+                          (m) => m._id === member._id
+                        );
+                        return (
+                          <button
+                            key={member._id}
+                            type="button"
+                            onClick={() => toggleMember(member)}
+                            disabled={
+                              !isSelected && selectedMembers.length >= 10
+                            }
+                            className={`w-full flex items-center gap-2 p-2 rounded text-left transition-smooth hover-lift gpu-accelerated ${
+                              isSelected
+                                ? "bg-green-100 border-2 border-green-500"
+                                : "bg-gray-50 hover:bg-gray-100 border border-gray-300"
+                            } ${
+                              !isSelected && selectedMembers.length >= 10
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            {member.avatarUrl && (
+                              <img
+                                src={member.avatarUrl}
+                                alt=""
+                                className="w-8 h-8 rounded-full hover-grow transition-smooth gpu-accelerated"
+                              />
+                            )}
+                            <div className="flex-1">
+                              <div className="text-xs font-medium">
+                                {member.ingameName || member.username}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {member.username}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <span className="text-green-600 font-bold">
+                                <i className="fa-solid fa-check"></i>
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Selected Members Display */}
-              {selectedMembers.length > 0 && (
-                <div className="mb-3 p-3 bg-gray-50 rounded-lg border-2 border-gray-300 animate-fade-in gpu-accelerated">
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Team 1 */}
-                    <div>
-                      <h3 className="text-xs font-semibold text-blue-600 mb-2">
-                        Đội 1 ({selectedMembers.slice(0, 5).length}/5)
-                      </h3>
-                      <div className="space-y-1">
-                        {selectedMembers.slice(0, 5).map((m) => (
-                          <div
-                            key={m._id}
-                            className="flex items-center gap-2 p-2 bg-white rounded border hover-lift transition-smooth gpu-accelerated"
-                          >
-                            {m.avatarUrl && (
-                              <img
-                                src={m.avatarUrl}
-                                alt=""
-                                className="w-6 h-6 rounded-full hover-grow transition-smooth gpu-accelerated"
-                              />
-                            )}
-                            <span className="text-xs font-medium flex-1">
-                              {m.ingameName || m.username}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => toggleMember(m)}
-                              className="text-red-500 hover:text-red-700 text-xs transition-smooth hover-shrink"
-                            >
-                              <i className="fa-solid fa-xmark"></i>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Team 2 */}
-                    <div>
-                      <h3 className="text-xs font-semibold text-red-600 mb-2">
-                        Đội 2 ({selectedMembers.slice(5, 10).length}/5)
-                      </h3>
-                      <div className="space-y-1">
-                        {selectedMembers.slice(5, 10).map((m) => (
-                          <div
-                            key={m._id}
-                            className="flex items-center gap-2 p-2 bg-white rounded border hover-lift transition-smooth gpu-accelerated"
-                          >
-                            {m.avatarUrl && (
-                              <img
-                                src={m.avatarUrl}
-                                alt=""
-                                className="w-6 h-6 rounded-full hover-grow transition-smooth gpu-accelerated"
-                              />
-                            )}
-                            <span className="text-xs font-medium flex-1">
-                              {m.ingameName || m.username}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => toggleMember(m)}
-                              className="text-red-500 hover:text-red-700 text-xs transition-smooth hover-shrink"
-                            >
-                              <i className="fa-solid fa-xmark"></i>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Member Selection Dropdown */}
-              {showMemberSelect && (
-                <div className="max-h-60 overflow-y-auto bg-white border-2 border-gray-300 rounded-lg p-2 animate-scale-in gpu-accelerated">
-                  <div className="space-y-1">
-                    {members.map((member) => {
-                      const isSelected = selectedMembers.find(
-                        (m) => m._id === member._id
-                      );
-                      return (
-                        <button
-                          key={member._id}
-                          type="button"
-                          onClick={() => toggleMember(member)}
-                          disabled={!isSelected && selectedMembers.length >= 10}
-                          className={`w-full flex items-center gap-2 p-2 rounded text-left transition-smooth hover-lift gpu-accelerated ${
-                            isSelected
-                              ? "bg-green-100 border-2 border-green-500"
-                              : "bg-gray-50 hover:bg-gray-100 border border-gray-300"
-                          } ${
-                            !isSelected && selectedMembers.length >= 10
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
-                          }`}
-                        >
-                          {member.avatarUrl && (
-                            <img
-                              src={member.avatarUrl}
-                              alt=""
-                              className="w-8 h-8 rounded-full hover-grow transition-smooth gpu-accelerated"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <div className="text-xs font-medium">
-                              {member.ingameName || member.username}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {member.username}
-                            </div>
-                          </div>
-                          {isSelected && (
-                            <span className="text-green-600 font-bold">
-                              <i className="fa-solid fa-check"></i>
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
 
             <button
               type="submit"
-              className="w-full py-2 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm md:text-base font-bold shadow-lg transition"
+              disabled={
+                !!(selectedTournament && (!selectedTeam1 || !selectedTeam2))
+              }
+              className="w-full py-2 md:py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg text-sm md:text-base font-bold shadow-lg transition"
             >
-              Tạo Custom
+              {selectedTournament
+                ? selectedTeam1 && selectedTeam2
+                  ? "Tạo phòng Giải Đấu"
+                  : "Chọn 2 team để tiếp tục"
+                : "Tạo Custom"}
             </button>
           </div>
         </form>
@@ -517,7 +743,12 @@ export default function CustomsPage() {
           >
             <div className="flex items-start justify-between gap-2 mb-2">
               <Link to={`/customs/${c._id}`} className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm md:text-lg text-gray-900 line-clamp-1">
+                <h3 className="font-semibold text-sm md:text-lg text-gray-900 line-clamp-1 flex items-center gap-2">
+                  {c.isTournamentRoom && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded text-xs font-semibold">
+                      <i className="fa-solid fa-trophy"></i>
+                    </span>
+                  )}
                   {c.title}
                 </h3>
               </Link>
@@ -678,6 +909,23 @@ export default function CustomsPage() {
           setPendingDeleteId(null);
         }}
       />
+
+      {/* Tournament Select Modal */}
+      <TournamentSelectModal
+        open={showTournamentSelect}
+        onClose={() => setShowTournamentSelect(false)}
+        onSelect={handleTournamentSelect}
+      />
+
+      {/* Team Select Modal */}
+      {selectedTournament && (
+        <TeamSelectModal
+          open={showTeamSelect}
+          tournamentId={selectedTournament._id}
+          onClose={() => setShowTeamSelect(false)}
+          onSelect={handleTeamSelect}
+        />
+      )}
     </div>
   );
 }

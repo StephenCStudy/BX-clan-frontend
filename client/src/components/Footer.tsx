@@ -164,7 +164,7 @@ export default function Footer() {
               <span className="text-red-500">
                 <i className="fa-solid fa-heart"></i>
               </span>{" "}
-              for the Wild Rift community - website version 1.2.2
+              for the Wild Rift community - website version 1.2.4
             </p>
             <div className="flex gap-4">
               <a
@@ -184,6 +184,12 @@ export default function Footer() {
                 className="hover:text-red-400 transition-fast"
               >
                 Source Code
+              </a>
+              <a
+                href="https://youtu.be/jYGIFNOXWPM"
+                className="hover:text-red-400 transition-fast"
+              >
+                Video hướng dẫn
               </a>
             </div>
           </div>

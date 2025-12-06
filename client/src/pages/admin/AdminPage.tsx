@@ -10,6 +10,34 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
 import { createSocket } from "../../utils/socket";
 import type { Socket } from "socket.io-client";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Filler,
+} from "chart.js";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Filler
+);
 
 type Tab =
   | "overview"
@@ -641,218 +669,291 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Charts Section */}
+          {/* Charts Section - Using Chart.js */}
           <div className="bg-white rounded-xl border-2 border-gray-200 p-4 sm:p-5 md:p-6 shadow-lg">
             <h2 className="text-xl sm:text-2xl font-bold mb-6 text-indigo-600 flex items-center gap-3">
               <span className="w-2 h-8 bg-indigo-500 rounded-full"></span>
-              Biểu đồ tổng quan
+              <i className="fa-solid fa-chart-pie"></i>
+              Thống kê & Biểu đồ
             </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-              {/* Members by Role Chart */}
-              <div className="bg-linear-to-br from-emerald-50 via-white to-teal-50 rounded-2xl p-6 border-2 border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
-                <h3 className="text-lg font-bold mb-5 text-emerald-700 flex items-center gap-2 border-b-2 border-emerald-100 pb-3">
-                  <span className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600">
-                    <i className="fa-solid fa-users"></i>
-                  </span>
-                  Thành viên theo Role
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {/* Members by Role - Doughnut Chart */}
+              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 border-2 border-emerald-200 shadow-sm hover:shadow-lg transition-all">
+                <h3 className="text-lg font-bold mb-4 text-emerald-700 flex items-center gap-2">
+                  <i className="fa-solid fa-users-gear text-emerald-600"></i>
+                  Phân bố thành viên theo Role
                 </h3>
-                <div className="h-64 flex items-end justify-around gap-3 px-2 pt-4 border-b-2 border-dashed border-gray-200">
-                  {[
-                    {
-                      role: "Leader",
-                      count: members.filter((m: any) => m.role === "leader")
-                        .length,
-                      color: "bg-linear-to-t from-red-600 to-red-400",
-                      bgColor: "bg-red-50",
-                      borderColor: "border-red-200",
-                    },
-                    {
-                      role: "Organizer",
-                      count: members.filter((m: any) => m.role === "organizer")
-                        .length,
-                      color: "bg-linear-to-t from-blue-600 to-blue-400",
-                      bgColor: "bg-blue-50",
-                      borderColor: "border-blue-200",
-                    },
-                    {
-                      role: "Moderator",
-                      count: members.filter((m: any) => m.role === "moderator")
-                        .length,
-                      color: "bg-linear-to-t from-purple-600 to-purple-400",
-                      bgColor: "bg-purple-50",
-                      borderColor: "border-purple-200",
-                    },
-                    {
-                      role: "Member",
-                      count: members.filter((m: any) => m.role === "member")
-                        .length,
-                      color: "bg-linear-to-t from-gray-600 to-gray-400",
-                      bgColor: "bg-gray-50",
-                      borderColor: "border-gray-200",
-                    },
-                  ].map((item, index) => {
-                    const maxCount = Math.max(
-                      members.filter((m: any) => m.role === "leader").length,
-                      members.filter((m: any) => m.role === "organizer").length,
-                      members.filter((m: any) => m.role === "moderator").length,
-                      members.filter((m: any) => m.role === "member").length,
-                      1
-                    );
-                    const heightPercent = Math.max(
-                      (item.count / maxCount) * 100,
-                      8
-                    );
-                    return (
-                      <div
-                        key={item.role}
-                        className={`flex-1 flex flex-col items-center group ${
-                          index < 3
-                            ? "border-r-2 border-dashed border-gray-200 pr-3"
-                            : ""
-                        }`}
-                      >
-                        <div className="relative w-full flex flex-col items-center">
-                          <div
-                            className={`mb-3 px-3 py-1.5 ${item.bgColor} rounded-lg shadow-sm border ${item.borderColor} group-hover:scale-110 transition-all duration-200`}
-                          >
-                            <span className="text-lg font-black text-gray-800">
-                              {item.count}
-                            </span>
-                          </div>
-                          <div
-                            className={`w-4/5 ${item.color} rounded-t-lg shadow-md hover:shadow-lg transition-all duration-300 group-hover:w-full`}
-                            style={{
-                              height: `${heightPercent}%`,
-                              minHeight: "16px",
-                            }}
-                          />
-                        </div>
-                        <p className="text-xs md:text-sm font-bold mt-3 text-gray-600 text-center">
-                          {item.role}
-                        </p>
-                      </div>
-                    );
-                  })}
+                <div className="h-64 flex items-center justify-center">
+                  <Doughnut
+                    data={{
+                      labels: ["Leader", "Organizer", "Moderator", "Member"],
+                      datasets: [
+                        {
+                          data: [
+                            members.filter((m: any) => m.role === "leader").length,
+                            members.filter((m: any) => m.role === "organizer").length,
+                            members.filter((m: any) => m.role === "moderator").length,
+                            members.filter((m: any) => m.role === "member").length,
+                          ],
+                          backgroundColor: [
+                            "rgba(220, 38, 38, 0.8)",
+                            "rgba(37, 99, 235, 0.8)",
+                            "rgba(147, 51, 234, 0.8)",
+                            "rgba(107, 114, 128, 0.8)",
+                          ],
+                          borderColor: [
+                            "rgba(220, 38, 38, 1)",
+                            "rgba(37, 99, 235, 1)",
+                            "rgba(147, 51, 234, 1)",
+                            "rgba(107, 114, 128, 1)",
+                          ],
+                          borderWidth: 2,
+                          hoverOffset: 10,
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: "bottom",
+                          labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            font: { size: 12, weight: "bold" },
+                          },
+                        },
+                        tooltip: {
+                          backgroundColor: "rgba(0,0,0,0.8)",
+                          titleFont: { size: 14, weight: "bold" },
+                          bodyFont: { size: 13 },
+                          padding: 12,
+                          callbacks: {
+                            label: (context) => {
+                              const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+                              const percentage = ((context.raw as number / total) * 100).toFixed(1);
+                              return `${context.label}: ${context.raw} (${percentage}%)`;
+                            },
+                          },
+                        },
+                      },
+                      cutout: "60%",
+                    }}
+                  />
+                </div>
+                <div className="mt-4 text-center">
+                  <span className="text-2xl font-bold text-emerald-600">{members.length}</span>
+                  <span className="text-gray-600 ml-2">Tổng thành viên</span>
                 </div>
               </div>
 
-              {/* Rooms by Time Period Chart */}
-              <div className="bg-linear-to-br from-violet-50 via-white to-indigo-50 rounded-2xl p-6 border-2 border-violet-200 shadow-sm hover:shadow-md transition-shadow">
-                <h3 className="text-lg font-bold mb-5 text-violet-700 flex items-center gap-2 border-b-2 border-violet-100 pb-3">
-                  <span className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center text-violet-600">
-                    <i className="fa-solid fa-house"></i>
-                  </span>
-                  Phòng theo thời gian
+              {/* Room Status - Bar Chart */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-200 shadow-sm hover:shadow-lg transition-all">
+                <h3 className="text-lg font-bold mb-4 text-blue-700 flex items-center gap-2">
+                  <i className="fa-solid fa-gamepad text-blue-600"></i>
+                  Trạng thái phòng Custom
                 </h3>
-                <div className="h-64 flex items-end justify-around gap-3 px-2 pt-4 border-b-2 border-dashed border-gray-200">
-                  {(() => {
-                    const now = new Date();
-                    const today = now.toDateString();
-                    const thisMonth = now.getMonth();
-                    const thisYear = now.getFullYear();
-
-                    const roomsToday = customs.filter((c: any) => {
-                      const d = new Date(c.createdAt || c.scheduleTime);
-                      return d.toDateString() === today;
-                    }).length;
-
-                    const roomsThisMonth = customs.filter((c: any) => {
-                      const d = new Date(c.createdAt || c.scheduleTime);
-                      return (
-                        d.getMonth() === thisMonth &&
-                        d.getFullYear() === thisYear
-                      );
-                    }).length;
-
-                    const roomsThisYear = customs.filter((c: any) => {
-                      const d = new Date(c.createdAt || c.scheduleTime);
-                      return d.getFullYear() === thisYear;
-                    }).length;
-
-                    const totalRooms = customs.length;
-
-                    const chartData = [
-                      {
-                        label: "Hôm nay",
-                        count: roomsToday,
-                        color: "bg-linear-to-t from-cyan-600 to-cyan-400",
-                        bgColor: "bg-cyan-50",
-                        borderColor: "border-cyan-200",
-                        icon: "fa-calendar-day",
+                <div className="h-64">
+                  <Bar
+                    data={{
+                      labels: ["Đang mở", "Đang chơi", "Đã đóng"],
+                      datasets: [
+                        {
+                          label: "Số phòng",
+                          data: [
+                            customs.filter((c: any) => c.status === "open").length,
+                            customs.filter((c: any) => c.status === "ongoing").length,
+                            customs.filter((c: any) => c.status === "closed").length,
+                          ],
+                          backgroundColor: [
+                            "rgba(34, 197, 94, 0.8)",
+                            "rgba(234, 179, 8, 0.8)",
+                            "rgba(107, 114, 128, 0.8)",
+                          ],
+                          borderColor: [
+                            "rgba(34, 197, 94, 1)",
+                            "rgba(234, 179, 8, 1)",
+                            "rgba(107, 114, 128, 1)",
+                          ],
+                          borderWidth: 2,
+                          borderRadius: 8,
+                          borderSkipped: false,
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          backgroundColor: "rgba(0,0,0,0.8)",
+                          titleFont: { size: 14, weight: "bold" },
+                          bodyFont: { size: 13 },
+                          padding: 12,
+                        },
                       },
-                      {
-                        label: "Tháng này",
-                        count: roomsThisMonth,
-                        color: "bg-linear-to-t from-violet-600 to-violet-400",
-                        bgColor: "bg-violet-50",
-                        borderColor: "border-violet-200",
-                        icon: "fa-calendar-week",
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          ticks: {
+                            stepSize: 1,
+                            font: { weight: "bold" },
+                          },
+                          grid: { color: "rgba(0,0,0,0.05)" },
+                        },
+                        x: {
+                          ticks: { font: { weight: "bold" } },
+                          grid: { display: false },
+                        },
                       },
-                      {
-                        label: "Năm nay",
-                        count: roomsThisYear,
-                        color: "bg-linear-to-t from-fuchsia-600 to-fuchsia-400",
-                        bgColor: "bg-fuchsia-50",
-                        borderColor: "border-fuchsia-200",
-                        icon: "fa-calendar",
-                      },
-                      {
-                        label: "Tổng cộng",
-                        count: totalRooms,
-                        color: "bg-linear-to-t from-indigo-600 to-indigo-400",
-                        bgColor: "bg-indigo-50",
-                        borderColor: "border-indigo-200",
-                        icon: "fa-chart-simple",
-                      },
-                    ];
-
-                    const maxCount = Math.max(
-                      ...chartData.map((d) => d.count),
-                      1
-                    );
-
-                    return chartData.map((item, index) => {
-                      const heightPercent = Math.max(
-                        (item.count / maxCount) * 100,
-                        8
-                      );
-                      return (
-                        <div
-                          key={item.label}
-                          className={`flex-1 flex flex-col items-center group ${
-                            index < 3
-                              ? "border-r-2 border-dashed border-gray-200 pr-3"
-                              : ""
-                          }`}
-                        >
-                          <div className="relative w-full flex flex-col items-center">
-                            <div
-                              className={`mb-3 px-3 py-1.5 ${item.bgColor} rounded-lg shadow-sm border ${item.borderColor} group-hover:scale-110 transition-all duration-200 flex items-center gap-1`}
-                            >
-                              <i
-                                className={`fa-solid ${item.icon} text-sm`}
-                              ></i>
-                              <span className="text-lg font-black text-gray-800">
-                                {item.count}
-                              </span>
-                            </div>
-                            <div
-                              className={`w-4/5 ${item.color} rounded-t-lg shadow-md hover:shadow-lg transition-all duration-300 group-hover:w-full`}
-                              style={{
-                                height: `${heightPercent}%`,
-                                minHeight: "16px",
-                              }}
-                            />
-                          </div>
-                          <p className="text-xs md:text-sm font-bold mt-3 text-gray-600 text-center">
-                            {item.label}
-                          </p>
-                        </div>
-                      );
-                    });
-                  })()}
+                    }}
+                  />
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-green-100 rounded-lg p-2">
+                    <div className="text-lg font-bold text-green-600">
+                      {customs.filter((c: any) => c.status === "open").length}
+                    </div>
+                    <div className="text-xs text-green-700">Đang mở</div>
+                  </div>
+                  <div className="bg-yellow-100 rounded-lg p-2">
+                    <div className="text-lg font-bold text-yellow-600">
+                      {customs.filter((c: any) => c.status === "ongoing").length}
+                    </div>
+                    <div className="text-xs text-yellow-700">Đang chơi</div>
+                  </div>
+                  <div className="bg-gray-100 rounded-lg p-2">
+                    <div className="text-lg font-bold text-gray-600">
+                      {customs.filter((c: any) => c.status === "closed").length}
+                    </div>
+                    <div className="text-xs text-gray-700">Đã đóng</div>
+                  </div>
                 </div>
               </div>
+
+              {/* Activity Timeline - Line Chart */}
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200 shadow-sm hover:shadow-lg transition-all lg:col-span-2 xl:col-span-1">
+                <h3 className="text-lg font-bold mb-4 text-purple-700 flex items-center gap-2">
+                  <i className="fa-solid fa-chart-line text-purple-600"></i>
+                  Hoạt động 7 ngày gần đây
+                </h3>
+                <div className="h-64">
+                  <Line
+                    data={{
+                      labels: (() => {
+                        const days = [];
+                        for (let i = 6; i >= 0; i--) {
+                          const d = new Date();
+                          d.setDate(d.getDate() - i);
+                          days.push(d.toLocaleDateString("vi-VN", { weekday: "short", day: "numeric" }));
+                        }
+                        return days;
+                      })(),
+                      datasets: [
+                        {
+                          label: "Phòng tạo mới",
+                          data: (() => {
+                            const counts = [];
+                            for (let i = 6; i >= 0; i--) {
+                              const d = new Date();
+                              d.setDate(d.getDate() - i);
+                              const dateStr = d.toDateString();
+                              counts.push(
+                                customs.filter((c: any) => {
+                                  const cd = new Date(c.createdAt || c.scheduleTime);
+                                  return cd.toDateString() === dateStr;
+                                }).length
+                              );
+                            }
+                            return counts;
+                          })(),
+                          borderColor: "rgba(147, 51, 234, 1)",
+                          backgroundColor: "rgba(147, 51, 234, 0.1)",
+                          borderWidth: 3,
+                          fill: true,
+                          tension: 0.4,
+                          pointBackgroundColor: "rgba(147, 51, 234, 1)",
+                          pointBorderColor: "#fff",
+                          pointBorderWidth: 2,
+                          pointRadius: 5,
+                          pointHoverRadius: 8,
+                        },
+                        {
+                          label: "Tin tức mới",
+                          data: (() => {
+                            const counts = [];
+                            for (let i = 6; i >= 0; i--) {
+                              const d = new Date();
+                              d.setDate(d.getDate() - i);
+                              const dateStr = d.toDateString();
+                              counts.push(
+                                news.filter((n: any) => {
+                                  const nd = new Date(n.createdAt);
+                                  return nd.toDateString() === dateStr;
+                                }).length
+                              );
+                            }
+                            return counts;
+                          })(),
+                          borderColor: "rgba(236, 72, 153, 1)",
+                          backgroundColor: "rgba(236, 72, 153, 0.1)",
+                          borderWidth: 3,
+                          fill: true,
+                          tension: 0.4,
+                          pointBackgroundColor: "rgba(236, 72, 153, 1)",
+                          pointBorderColor: "#fff",
+                          pointBorderWidth: 2,
+                          pointRadius: 5,
+                          pointHoverRadius: 8,
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: "bottom",
+                          labels: {
+                            padding: 15,
+                            usePointStyle: true,
+                            font: { size: 12, weight: "bold" },
+                          },
+                        },
+                        tooltip: {
+                          backgroundColor: "rgba(0,0,0,0.8)",
+                          titleFont: { size: 14, weight: "bold" },
+                          bodyFont: { size: 13 },
+                          padding: 12,
+                          mode: "index",
+                          intersect: false,
+                        },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          ticks: { stepSize: 1, font: { weight: "bold" } },
+                          grid: { color: "rgba(0,0,0,0.05)" },
+                        },
+                        x: {
+                          ticks: { font: { size: 10, weight: "bold" } },
+                          grid: { display: false },
+                        },
+                      },
+                      interaction: {
+                        mode: "nearest",
+                        axis: "x",
+                        intersect: false,
+                      },
+                    }}
+                  />
+                </div>
+              </div>
+
+            
             </div>
           </div>
         </div>

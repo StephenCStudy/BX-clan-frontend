@@ -23,6 +23,39 @@ interface Custom {
   players?: any[];
   team1?: any[];
   team2?: any[];
+  // Tournament fields
+  isTournamentRoom?: boolean;
+  tournament?: {
+    _id: string;
+    name: string;
+    status: string;
+    currentRound: number;
+  };
+  tournamentTeam1?: {
+    _id: string;
+    name: string;
+    tag?: string;
+    logoUrl?: string;
+    members?: any[];
+  };
+  tournamentTeam2?: {
+    _id: string;
+    name: string;
+    tag?: string;
+    logoUrl?: string;
+    members?: any[];
+  };
+  tournamentRound?: number;
+  winningTeam?: {
+    _id: string;
+    name: string;
+    tag?: string;
+    logoUrl?: string;
+  };
+  // Simple tournament room fields (no Team model)
+  tournamentName?: string;
+  winningTeamName?: string; // "team1" or "team2"
+  newsReference?: string;
 }
 
 interface Registration {
@@ -85,6 +118,16 @@ export default function CustomDetailPage() {
   const [showTeamEditModal, setShowTeamEditModal] = useState(false);
   const [editTeam1, setEditTeam1] = useState<any[]>([]);
   const [editTeam2, setEditTeam2] = useState<any[]>([]);
+  // Tournament finish states
+  const [showFinishTournamentModal, setShowFinishTournamentModal] =
+    useState(false);
+  const [selectedWinningTeam, setSelectedWinningTeam] = useState<string | null>(
+    null
+  );
+  const [finishingMatch, setFinishingMatch] = useState(false);
+  // Result modal state - shows when room is closed with a winner
+  const [showResultModal, setShowResultModal] = useState(false);
+
   const socketRef = useRef<Socket | null>(null);
   const gameModeOptions = [
     { value: "5vs5", label: "5vs5 - Summoner's Rift" },
@@ -179,6 +222,80 @@ export default function CustomDetailPage() {
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Lỗi cập nhật đội hình");
     }
+  };
+
+  // Finish tournament match - lưu team thắng (có Team model)
+  const finishTournamentMatch = async () => {
+    if (!id || !selectedWinningTeam || !custom?.isTournamentRoom) return;
+
+    setFinishingMatch(true);
+    try {
+      const res = await http.post(`/customs/${id}/finish-tournament-match`, {
+        winningTeamId: selectedWinningTeam,
+      });
+
+      toast.success("Đã kết thúc trận đấu và lưu kết quả!");
+      setShowFinishTournamentModal(false);
+      setSelectedWinningTeam(null);
+
+      // Cập nhật custom data
+      if (res.data.customRoom) {
+        setCustom(res.data.customRoom);
+      } else {
+        const refreshRes = await http.get(`/customs/${id}`);
+        setCustom(refreshRes.data);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Lỗi kết thúc trận đấu");
+    } finally {
+      setFinishingMatch(false);
+    }
+  };
+
+  // Finish simple tournament match - không có Team model
+  const finishSimpleTournamentMatch = async () => {
+    if (!id || !selectedWinningTeam || !custom?.isTournamentRoom) return;
+
+    setFinishingMatch(true);
+    try {
+      const res = await http.post(`/customs/${id}/finish-simple-tournament`, {
+        winningTeamName: selectedWinningTeam, // "team1" or "team2"
+        team1Score,
+        team2Score,
+      });
+
+      toast.success("Đã kết thúc trận đấu và lưu kết quả!");
+      setShowFinishTournamentModal(false);
+      setSelectedWinningTeam(null);
+
+      // Cập nhật custom data
+      if (res.data.customRoom) {
+        setCustom(res.data.customRoom);
+      } else {
+        const refreshRes = await http.get(`/customs/${id}`);
+        setCustom(refreshRes.data);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Lỗi kết thúc trận đấu");
+    } finally {
+      setFinishingMatch(false);
+    }
+  };
+
+  // Kiểm tra xem có thể kết thúc trận đấu không
+  const canFinishTournamentMatch = () => {
+    if (!custom?.isTournamentRoom) return false;
+    if (custom?.winningTeam || custom?.winningTeamName) return false; // Đã có team thắng rồi
+    if (custom?.status === "closed") return false;
+    // Cho phép kết thúc bất cứ lúc nào (admin chọn team thắng)
+    return true;
+  };
+
+  // Xác định team thắng dựa trên điểm
+  const getLeadingTeam = () => {
+    if (team1Score > team2Score) return custom?.tournamentTeam1;
+    if (team2Score > team1Score) return custom?.tournamentTeam2;
+    return null;
   };
 
   const loadMembers = async () => {
@@ -376,6 +493,17 @@ export default function CustomDetailPage() {
     return () => clearInterval(interval);
   }, [id, user, canManage]);
 
+  // Auto show result modal when room is closed with winner
+  useEffect(() => {
+    if (
+      custom?.status === "closed" &&
+      custom?.isTournamentRoom &&
+      (custom?.winningTeam || custom?.winningTeamName)
+    ) {
+      setShowResultModal(true);
+    }
+  }, [custom]);
+
   useEffect(() => {
     if (canManage) {
       const edit = searchParams.get("edit");
@@ -400,6 +528,67 @@ export default function CustomDetailPage() {
 
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Kiểm tra nếu đang đóng phòng tournament
+    if (editForm.status === "closed" && custom?.isTournamentRoom) {
+      // Nếu chưa có team thắng
+      if (!custom?.winningTeam && !custom?.winningTeamName) {
+        const bestOf = custom?.bestOf || 3;
+        const winsNeeded = Math.ceil(bestOf / 2);
+
+        // Tự động xác định team thắng dựa trên điểm
+        if (team1Score >= winsNeeded || team2Score >= winsNeeded) {
+          // Có team đạt đủ điểm thắng - tự động kết thúc trận
+          if (custom?.tournamentTeam1 && custom?.tournamentTeam2) {
+            // Tournament room với Team model
+            const winningTeamId =
+              team1Score > team2Score
+                ? custom.tournamentTeam1._id
+                : custom.tournamentTeam2._id;
+            setSelectedWinningTeam(winningTeamId);
+            setShowFinishTournamentModal(true);
+            toast.info(
+              "Vui lòng xác nhận team thắng trước khi đóng phòng giải đấu."
+            );
+            return;
+          } else {
+            // Simple tournament room
+            const winningTeamName = team1Score > team2Score ? "team1" : "team2";
+            setSelectedWinningTeam(winningTeamName);
+            setShowFinishTournamentModal(true);
+            toast.info(
+              "Vui lòng xác nhận team thắng trước khi đóng phòng giải đấu."
+            );
+            return;
+          }
+        } else if (team1Score !== team2Score) {
+          // Chưa đạt đủ điểm nhưng có team dẫn trước
+          if (custom?.tournamentTeam1 && custom?.tournamentTeam2) {
+            const winningTeamId =
+              team1Score > team2Score
+                ? custom.tournamentTeam1._id
+                : custom.tournamentTeam2._id;
+            setSelectedWinningTeam(winningTeamId);
+          } else {
+            const winningTeamName = team1Score > team2Score ? "team1" : "team2";
+            setSelectedWinningTeam(winningTeamName);
+          }
+          setShowFinishTournamentModal(true);
+          toast.info(
+            "Vui lòng xác nhận team thắng trước khi đóng phòng giải đấu."
+          );
+          return;
+        } else {
+          // Điểm hòa - bắt buộc chọn thủ công
+          setShowFinishTournamentModal(true);
+          toast.warning(
+            "Điểm số hòa nhau. Vui lòng chọn team thắng trước khi đóng phòng."
+          );
+          return;
+        }
+      }
+    }
+
     try {
       await http.put(`/customs/${id}`, {
         ...editForm,
@@ -509,7 +698,91 @@ export default function CustomDetailPage() {
         </div>
 
         {/* Title Card */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 border-red-600">
+        <div
+          className={`bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 ${
+            custom.isTournamentRoom ? "border-yellow-500" : "border-red-600"
+          }`}
+        >
+          {/* Tournament Badge */}
+          {custom.isTournamentRoom && custom.tournament && (
+            <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <i className="fa-solid fa-trophy text-yellow-500 text-lg"></i>
+                  <div>
+                    <span className="font-semibold text-yellow-800">
+                      {custom.tournament.name}
+                    </span>
+                    <span className="ml-2 px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded text-xs">
+                      Vòng{" "}
+                      {custom.tournamentRound || custom.tournament.currentRound}
+                    </span>
+                  </div>
+                </div>
+                {custom.winningTeam && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-lg border border-green-300">
+                    <i className="fa-solid fa-crown text-yellow-500"></i>
+                    <span className="font-semibold text-green-700">
+                      Team thắng:{" "}
+                      {custom.winningTeam.tag || custom.winningTeam.name}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Tournament Teams Info */}
+              {custom.tournamentTeam1 && custom.tournamentTeam2 && (
+                <div className="flex items-center justify-center gap-4 mt-3 p-2 bg-white rounded border">
+                  <div className="flex items-center gap-2">
+                    {custom.tournamentTeam1.logoUrl && (
+                      <img
+                        src={custom.tournamentTeam1.logoUrl}
+                        alt=""
+                        className="w-8 h-8 rounded-full"
+                      />
+                    )}
+                    <span
+                      className={`font-semibold ${
+                        custom.winningTeam?._id === custom.tournamentTeam1._id
+                          ? "text-green-600"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {custom.tournamentTeam1.tag ||
+                        custom.tournamentTeam1.name}
+                    </span>
+                    {custom.winningTeam?._id === custom.tournamentTeam1._id && (
+                      <i className="fa-solid fa-crown text-yellow-500"></i>
+                    )}
+                  </div>
+                  <span className="font-bold text-gray-400">VS</span>
+                  <div className="flex items-center gap-2">
+                    {custom.winningTeam?._id === custom.tournamentTeam2._id && (
+                      <i className="fa-solid fa-crown text-yellow-500"></i>
+                    )}
+                    <span
+                      className={`font-semibold ${
+                        custom.winningTeam?._id === custom.tournamentTeam2._id
+                          ? "text-green-600"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {custom.tournamentTeam2.tag ||
+                        custom.tournamentTeam2.name}
+                    </span>
+                    {custom.tournamentTeam2.logoUrl && (
+                      <img
+                        src={custom.tournamentTeam2.logoUrl}
+                        alt=""
+                        className="w-8 h-8 rounded-full"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {!isEditing ? (
             <>
               <div className="flex items-start justify-between gap-3">
@@ -519,22 +792,69 @@ export default function CustomDetailPage() {
                   </h1>
                   <p className="text-gray-600 mb-4">{custom.description}</p>
                 </div>
-                {canManage && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="px-3 py-2 border-2 border-gray-300 rounded-lg hover:border-gray-400"
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      onClick={() => setConfirmOpen(true)}
-                      className="px-3 py-2 border-2 border-red-300 text-red-600 rounded-lg hover:border-red-400"
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                )}
+                <div className="flex gap-2 flex-wrap">
+                  {/* View Result Button - for everyone when room is closed with winner */}
+                  {custom.isTournamentRoom &&
+                    (custom.winningTeam || custom.winningTeamName) &&
+                    custom.status === "closed" && (
+                      <button
+                        onClick={() => setShowResultModal(true)}
+                        className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold flex items-center gap-1"
+                      >
+                        <i className="fa-solid fa-trophy"></i>
+                        Xem kết quả
+                      </button>
+                    )}
+
+                  {canManage && (
+                    <>
+                      {/* Finish Tournament Match Button */}
+                      {custom.isTournamentRoom &&
+                        !custom.winningTeam &&
+                        !custom.winningTeamName &&
+                        canFinishTournamentMatch() && (
+                          <button
+                            onClick={() => {
+                              // Auto-select winning team based on score for Team model mode
+                              if (
+                                custom.tournamentTeam1 &&
+                                custom.tournamentTeam2
+                              ) {
+                                const leadingTeam = getLeadingTeam();
+                                if (leadingTeam) {
+                                  setSelectedWinningTeam(leadingTeam._id);
+                                }
+                              } else {
+                                // Simple mode: auto-select based on score
+                                if (team1Score > team2Score) {
+                                  setSelectedWinningTeam("team1");
+                                } else if (team2Score > team1Score) {
+                                  setSelectedWinningTeam("team2");
+                                }
+                              }
+                              setShowFinishTournamentModal(true);
+                            }}
+                            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold flex items-center gap-1"
+                          >
+                            <i className="fa-solid fa-flag-checkered"></i>
+                            Kết thúc trận
+                          </button>
+                        )}
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="px-3 py-2 border-2 border-gray-300 rounded-lg hover:border-gray-400"
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        onClick={() => setConfirmOpen(true)}
+                        className="px-3 py-2 border-2 border-red-300 text-red-600 rounded-lg hover:border-red-400"
+                      >
+                        Xóa
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap gap-4 text-sm">
                 <span className="px-3 py-1 bg-gray-100 rounded-full inline-flex items-center gap-1">
@@ -1627,6 +1947,585 @@ export default function CustomDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Finish Tournament Match Modal - With Team Model */}
+      {showFinishTournamentModal &&
+        custom?.isTournamentRoom &&
+        custom?.tournamentTeam1 &&
+        custom?.tournamentTeam2 && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-lg w-full">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-900 inline-flex items-center gap-2">
+                  <i className="fa-solid fa-flag-checkered text-green-600"></i>{" "}
+                  Kết thúc trận đấu
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Chọn đội thắng để kết thúc trận đấu giải đấu
+                </p>
+              </div>
+
+              <div className="p-6">
+                {/* Current Score Display */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+                  <div className="text-center text-sm text-gray-600 mb-2">
+                    Tỉ số hiện tại
+                  </div>
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-red-600">
+                        {team1Score}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {custom.tournamentTeam1.tag ||
+                          custom.tournamentTeam1.name}
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold text-gray-400">-</span>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-blue-600">
+                        {team2Score}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {custom.tournamentTeam2.tag ||
+                          custom.tournamentTeam2.name}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Team Selection */}
+                <div className="space-y-3">
+                  <p className="font-semibold text-gray-700">
+                    Chọn đội chiến thắng:
+                  </p>
+
+                  {/* Team 1 Option */}
+                  <button
+                    onClick={() =>
+                      setSelectedWinningTeam(custom.tournamentTeam1?._id || "")
+                    }
+                    className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition ${
+                      selectedWinningTeam === custom.tournamentTeam1?._id
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    {custom.tournamentTeam1?.logoUrl ? (
+                      <img
+                        src={custom.tournamentTeam1.logoUrl}
+                        alt=""
+                        className="w-12 h-12 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                        <i className="fa-solid fa-circle text-red-500 text-xl"></i>
+                      </div>
+                    )}
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold text-gray-900">
+                        {custom.tournamentTeam1.name}
+                      </div>
+                      {custom.tournamentTeam1.tag && (
+                        <div className="text-sm text-gray-500">
+                          [{custom.tournamentTeam1.tag}]
+                        </div>
+                      )}
+                    </div>
+                    {selectedWinningTeam === custom.tournamentTeam1._id && (
+                      <i className="fa-solid fa-check-circle text-green-500 text-2xl"></i>
+                    )}
+                  </button>
+
+                  {/* Team 2 Option */}
+                  <button
+                    onClick={() =>
+                      setSelectedWinningTeam(custom.tournamentTeam2?._id || "")
+                    }
+                    className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition ${
+                      selectedWinningTeam === custom.tournamentTeam2?._id
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    {custom.tournamentTeam2?.logoUrl ? (
+                      <img
+                        src={custom.tournamentTeam2.logoUrl}
+                        alt=""
+                        className="w-12 h-12 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <i className="fa-solid fa-circle text-blue-500 text-xl"></i>
+                      </div>
+                    )}
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold text-gray-900">
+                        {custom.tournamentTeam2.name}
+                      </div>
+                      {custom.tournamentTeam2.tag && (
+                        <div className="text-sm text-gray-500">
+                          [{custom.tournamentTeam2.tag}]
+                        </div>
+                      )}
+                    </div>
+                    {selectedWinningTeam === custom.tournamentTeam2._id && (
+                      <i className="fa-solid fa-check-circle text-green-500 text-2xl"></i>
+                    )}
+                  </button>
+                </div>
+
+                {/* Warning */}
+                <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div className="flex items-start gap-2">
+                    <i className="fa-solid fa-triangle-exclamation text-yellow-600 mt-0.5"></i>
+                    <div className="text-sm text-yellow-800">
+                      <strong>Lưu ý:</strong> Sau khi xác nhận, kết quả sẽ được
+                      cập nhật vào giải đấu và không thể thay đổi.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex gap-3">
+                <button
+                  onClick={finishTournamentMatch}
+                  disabled={!selectedWinningTeam || finishingMatch}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition inline-flex items-center justify-center gap-2"
+                >
+                  {finishingMatch ? (
+                    <>
+                      <i className="fa-solid fa-spinner fa-spin"></i> Đang xử
+                      lý...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-check"></i> Xác nhận kết thúc
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowFinishTournamentModal(false);
+                    setSelectedWinningTeam(null);
+                  }}
+                  disabled={finishingMatch}
+                  className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 rounded-lg font-semibold transition"
+                >
+                  Hủy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* Finish Tournament Match Modal - Simple Mode (No Team Model) */}
+      {showFinishTournamentModal &&
+        custom?.isTournamentRoom &&
+        !custom?.tournamentTeam1 &&
+        !custom?.tournamentTeam2 && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-lg w-full">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-xl font-bold text-gray-900 inline-flex items-center gap-2">
+                  <i className="fa-solid fa-flag-checkered text-green-600"></i>{" "}
+                  Kết thúc trận đấu
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Chọn đội thắng để kết thúc trận đấu
+                </p>
+              </div>
+
+              <div className="p-6">
+                {/* Current Score Display */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
+                  <div className="text-center text-sm text-gray-600 mb-2">
+                    Tỉ số hiện tại
+                  </div>
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-red-600">
+                        {team1Score}
+                      </div>
+                      <div className="text-sm text-gray-600">Team 1</div>
+                    </div>
+                    <span className="text-2xl font-bold text-gray-400">-</span>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-blue-600">
+                        {team2Score}
+                      </div>
+                      <div className="text-sm text-gray-600">Team 2</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Team Selection */}
+                <div className="space-y-3">
+                  <p className="font-semibold text-gray-700">
+                    Chọn đội chiến thắng:
+                  </p>
+
+                  {/* Team 1 Option */}
+                  <button
+                    onClick={() => setSelectedWinningTeam("team1")}
+                    className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition ${
+                      selectedWinningTeam === "team1"
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                      <i className="fa-solid fa-users text-red-500 text-xl"></i>
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold text-gray-900">Team 1</div>
+                      <div className="text-sm text-gray-500">
+                        {custom.team1?.length || 0} thành viên
+                      </div>
+                    </div>
+                    {selectedWinningTeam === "team1" && (
+                      <i className="fa-solid fa-check-circle text-green-500 text-2xl"></i>
+                    )}
+                  </button>
+
+                  {/* Team 2 Option */}
+                  <button
+                    onClick={() => setSelectedWinningTeam("team2")}
+                    className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition ${
+                      selectedWinningTeam === "team2"
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <i className="fa-solid fa-users text-blue-500 text-xl"></i>
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold text-gray-900">Team 2</div>
+                      <div className="text-sm text-gray-500">
+                        {custom.team2?.length || 0} thành viên
+                      </div>
+                    </div>
+                    {selectedWinningTeam === "team2" && (
+                      <i className="fa-solid fa-check-circle text-green-500 text-2xl"></i>
+                    )}
+                  </button>
+                </div>
+
+                {/* Warning */}
+                <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div className="flex items-start gap-2">
+                    <i className="fa-solid fa-triangle-exclamation text-yellow-600 mt-0.5"></i>
+                    <div className="text-sm text-yellow-800">
+                      <strong>Lưu ý:</strong> Sau khi xác nhận, kết quả sẽ được
+                      lưu và không thể thay đổi.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex gap-3">
+                <button
+                  onClick={finishSimpleTournamentMatch}
+                  disabled={!selectedWinningTeam || finishingMatch}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition inline-flex items-center justify-center gap-2"
+                >
+                  {finishingMatch ? (
+                    <>
+                      <i className="fa-solid fa-spinner fa-spin"></i> Đang xử
+                      lý...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-check"></i> Xác nhận kết thúc
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowFinishTournamentModal(false);
+                    setSelectedWinningTeam(null);
+                  }}
+                  disabled={finishingMatch}
+                  className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 rounded-lg font-semibold transition"
+                >
+                  Hủy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* Result Modal - Shows when room is closed with winner */}
+      {showResultModal &&
+        custom?.isTournamentRoom &&
+        custom?.winningTeam &&
+        custom?.tournamentTeam1 &&
+        custom?.tournamentTeam2 && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl animate-scale-in">
+              {/* Header with confetti effect */}
+              <div className="bg-linear-to-r from-yellow-400 via-yellow-500 to-orange-500 p-6 text-center relative overflow-hidden">
+                <div className="absolute inset-0 opacity-20">
+                  <div className="absolute top-2 left-4 text-4xl">🎉</div>
+                  <div className="absolute top-4 right-6 text-3xl">🏆</div>
+                  <div className="absolute bottom-2 left-8 text-2xl">⭐</div>
+                  <div className="absolute bottom-4 right-4 text-3xl">🎊</div>
+                </div>
+                <div className="relative">
+                  <i className="fa-solid fa-trophy text-white text-5xl mb-3 drop-shadow-lg"></i>
+                  <h3 className="text-2xl font-bold text-white drop-shadow">
+                    Kết quả trận đấu
+                  </h3>
+                  {custom.tournament && (
+                    <p className="text-yellow-100 text-sm mt-1">
+                      {custom.tournament.name} - Vòng{" "}
+                      {custom.tournamentRound || custom.tournament.currentRound}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Score Display */}
+              <div className="p-6">
+                <div className="flex items-center justify-center gap-4 mb-6">
+                  {/* Team 1 */}
+                  <div
+                    className={`flex-1 text-center p-4 rounded-xl border-2 ${
+                      custom.winningTeam._id === custom.tournamentTeam1._id
+                        ? "bg-green-50 border-green-400"
+                        : "bg-red-50 border-red-300"
+                    }`}
+                  >
+                    {custom.tournamentTeam1.logoUrl ? (
+                      <img
+                        src={custom.tournamentTeam1.logoUrl}
+                        alt=""
+                        className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-white shadow"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-red-200 rounded-full mx-auto mb-2 flex items-center justify-center">
+                        <i className="fa-solid fa-users text-red-600 text-xl"></i>
+                      </div>
+                    )}
+                    <div className="font-bold text-gray-900">
+                      {custom.tournamentTeam1.tag ||
+                        custom.tournamentTeam1.name}
+                    </div>
+                    <div className="text-3xl font-bold mt-2 text-gray-800">
+                      {team1Score}
+                    </div>
+                    {custom.winningTeam._id === custom.tournamentTeam1._id ? (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-green-500 text-white rounded-full text-sm font-semibold">
+                        <i className="fa-solid fa-crown text-yellow-300"></i>{" "}
+                        THẮNG
+                      </div>
+                    ) : (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold">
+                        <i className="fa-solid fa-times"></i> THUA
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VS */}
+                  <div className="text-2xl font-bold text-gray-400">VS</div>
+
+                  {/* Team 2 */}
+                  <div
+                    className={`flex-1 text-center p-4 rounded-xl border-2 ${
+                      custom.winningTeam._id === custom.tournamentTeam2._id
+                        ? "bg-green-50 border-green-400"
+                        : "bg-red-50 border-red-300"
+                    }`}
+                  >
+                    {custom.tournamentTeam2.logoUrl ? (
+                      <img
+                        src={custom.tournamentTeam2.logoUrl}
+                        alt=""
+                        className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-white shadow"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-blue-200 rounded-full mx-auto mb-2 flex items-center justify-center">
+                        <i className="fa-solid fa-users text-blue-600 text-xl"></i>
+                      </div>
+                    )}
+                    <div className="font-bold text-gray-900">
+                      {custom.tournamentTeam2.tag ||
+                        custom.tournamentTeam2.name}
+                    </div>
+                    <div className="text-3xl font-bold mt-2 text-gray-800">
+                      {team2Score}
+                    </div>
+                    {custom.winningTeam._id === custom.tournamentTeam2._id ? (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-green-500 text-white rounded-full text-sm font-semibold">
+                        <i className="fa-solid fa-crown text-yellow-300"></i>{" "}
+                        THẮNG
+                      </div>
+                    ) : (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold">
+                        <i className="fa-solid fa-times"></i> THUA
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Winner Announcement */}
+                <div className="text-center p-4 bg-linear-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                  <p className="text-gray-600 text-sm mb-1">Đội chiến thắng</p>
+                  <div className="flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-crown text-yellow-500 text-xl"></i>
+                    <span className="text-xl font-bold text-green-700">
+                      {custom.winningTeam.name}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Match Info */}
+                <div className="mt-4 text-center text-sm text-gray-500">
+                  <p>Best of {custom.bestOf || 3}</p>
+                  <p className="mt-1">
+                    {new Date(custom.scheduleTime).toLocaleString("vi-VN")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={() => setShowResultModal(false)}
+                  className="w-full py-3 bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold transition shadow-md"
+                >
+                  <i className="fa-solid fa-check mr-2"></i>
+                  Đã hiểu
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* Result Modal - Simple Tournament Room (no Team Model) */}
+      {showResultModal &&
+        custom?.isTournamentRoom &&
+        custom?.winningTeamName &&
+        !custom?.tournamentTeam1 &&
+        !custom?.tournamentTeam2 && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl animate-scale-in">
+              {/* Header with confetti effect */}
+              <div className="bg-linear-to-r from-yellow-400 via-yellow-500 to-orange-500 p-6 text-center relative overflow-hidden">
+                <div className="absolute inset-0 opacity-20">
+                  <div className="absolute top-2 left-4 text-4xl">🎉</div>
+                  <div className="absolute top-4 right-6 text-3xl">🏆</div>
+                  <div className="absolute bottom-2 left-8 text-2xl">⭐</div>
+                  <div className="absolute bottom-4 right-4 text-3xl">🎊</div>
+                </div>
+                <div className="relative">
+                  <i className="fa-solid fa-trophy text-white text-5xl mb-3 drop-shadow-lg"></i>
+                  <h3 className="text-2xl font-bold text-white drop-shadow">
+                    Kết quả trận đấu
+                  </h3>
+                  {custom.tournamentName && (
+                    <p className="text-yellow-100 text-sm mt-1">
+                      {custom.tournamentName}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Score Display */}
+              <div className="p-6">
+                <div className="flex items-center justify-center gap-4 mb-6">
+                  {/* Team 1 */}
+                  <div
+                    className={`flex-1 text-center p-4 rounded-xl border-2 ${
+                      custom.winningTeamName === "team1"
+                        ? "bg-green-50 border-green-400"
+                        : "bg-red-50 border-red-300"
+                    }`}
+                  >
+                    <div className="w-16 h-16 bg-red-200 rounded-full mx-auto mb-2 flex items-center justify-center">
+                      <i className="fa-solid fa-users text-red-600 text-xl"></i>
+                    </div>
+                    <div className="font-bold text-gray-900">Team 1</div>
+                    <div className="text-3xl font-bold mt-2 text-gray-800">
+                      {custom.team1Score || 0}
+                    </div>
+                    {custom.winningTeamName === "team1" ? (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-green-500 text-white rounded-full text-sm font-semibold">
+                        <i className="fa-solid fa-crown text-yellow-300"></i>{" "}
+                        THẮNG
+                      </div>
+                    ) : (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold">
+                        <i className="fa-solid fa-times"></i> THUA
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VS */}
+                  <div className="text-2xl font-bold text-gray-400">VS</div>
+
+                  {/* Team 2 */}
+                  <div
+                    className={`flex-1 text-center p-4 rounded-xl border-2 ${
+                      custom.winningTeamName === "team2"
+                        ? "bg-green-50 border-green-400"
+                        : "bg-red-50 border-red-300"
+                    }`}
+                  >
+                    <div className="w-16 h-16 bg-blue-200 rounded-full mx-auto mb-2 flex items-center justify-center">
+                      <i className="fa-solid fa-users text-blue-600 text-xl"></i>
+                    </div>
+                    <div className="font-bold text-gray-900">Team 2</div>
+                    <div className="text-3xl font-bold mt-2 text-gray-800">
+                      {custom.team2Score || 0}
+                    </div>
+                    {custom.winningTeamName === "team2" ? (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-green-500 text-white rounded-full text-sm font-semibold">
+                        <i className="fa-solid fa-crown text-yellow-300"></i>{" "}
+                        THẮNG
+                      </div>
+                    ) : (
+                      <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-semibold">
+                        <i className="fa-solid fa-times"></i> THUA
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Winner Announcement */}
+                <div className="text-center p-4 bg-linear-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                  <p className="text-gray-600 text-sm mb-1">Đội chiến thắng</p>
+                  <div className="flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-crown text-yellow-500 text-xl"></i>
+                    <span className="text-xl font-bold text-green-700">
+                      {custom.winningTeamName === "team1" ? "Team 1" : "Team 2"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Match Info */}
+                <div className="mt-4 text-center text-sm text-gray-500">
+                  <p>Best of {custom.bestOf || 3}</p>
+                  <p className="mt-1">
+                    {new Date(custom.scheduleTime).toLocaleString("vi-VN")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={() => setShowResultModal(false)}
+                  className="w-full py-3 bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold transition shadow-md"
+                >
+                  <i className="fa-solid fa-check mr-2"></i>
+                  Đã hiểu
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
