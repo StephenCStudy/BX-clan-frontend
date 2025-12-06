@@ -61,9 +61,7 @@ export default function RegistrationPage() {
       // Load open custom rooms
       const roomsRes = await http.get("/customs", { params: { limit: 100 } });
       const rooms = roomsRes.data.items || roomsRes.data;
-      const openRooms = rooms.filter(
-        (r: CustomRoom) => r.status === "open"
-      );
+      const openRooms = rooms.filter((r: CustomRoom) => r.status === "open");
       setCustomRooms(openRooms);
 
       // Load user's registrations to check what they've already registered for
@@ -81,7 +79,9 @@ export default function RegistrationPage() {
 
   // Check if user has already registered for a news
   const hasRegisteredForNews = (newsId: string) => {
-    return myRegistrations.some((reg) => reg.news === newsId || (reg.news as any)?._id === newsId);
+    return myRegistrations.some(
+      (reg) => reg.news === newsId || (reg.news as any)?._id === newsId
+    );
   };
 
   // Check if user is already in a room
@@ -91,14 +91,15 @@ export default function RegistrationPage() {
       ...(room.team1 || []),
       ...(room.team2 || []),
     ];
-    return allPlayers.some((p: any) => 
-      p._id === user?._id || p === user?._id
-    );
+    return allPlayers.some((p: any) => p._id === user?.id || p === user?.id);
   };
 
   // Check if room is full
   const isRoomFull = (room: CustomRoom) => {
-    const totalPlayers = (room.team1?.length || 0) + (room.team2?.length || 0) + (room.players?.length || 0);
+    const totalPlayers =
+      (room.team1?.length || 0) +
+      (room.team2?.length || 0) +
+      (room.players?.length || 0);
     return totalPlayers >= room.maxPlayers;
   };
 
@@ -209,7 +210,8 @@ export default function RegistrationPage() {
                         </>
                       ) : (
                         <>
-                          <i className="fa-solid fa-pen-to-square"></i> Đăng ký ngay
+                          <i className="fa-solid fa-pen-to-square"></i> Đăng ký
+                          ngay
                         </>
                       )}
                     </button>
@@ -234,8 +236,11 @@ export default function RegistrationPage() {
             customRooms.map((room) => {
               const statusText = getRoomStatusText(room);
               const isDisabled = !!statusText;
-              const totalPlayers = (room.team1?.length || 0) + (room.team2?.length || 0) + (room.players?.length || 0);
-              
+              const totalPlayers =
+                (room.team1?.length || 0) +
+                (room.team2?.length || 0) +
+                (room.players?.length || 0);
+
               return (
                 <div
                   key={room._id}
@@ -263,11 +268,13 @@ export default function RegistrationPage() {
                         </span>
                       )}
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                      isRoomFull(room)
-                        ? "bg-red-100 text-red-700"
-                        : "bg-green-100 text-green-700"
-                    }`}>
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        isRoomFull(room)
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                    >
                       {totalPlayers}/{room.maxPlayers}
                     </span>
                   </div>
